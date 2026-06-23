@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yaadein — Database Schema Reference</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --bg-alt: #f7f6f3;
+    --border: #e4e2dc;
+    --text: #2c2c2a;
+    --text-secondary: #5f5e5a;
+    --text-tertiary: #888780;
+    --accent: #185fa5;
+    --accent-bg: #e6f1fb;
+    --code-bg: #f1efe8;
+    --tag-fk: #0f6e56;
+    --tag-fk-bg: #e1f5ee;
+    --tag-pk: #993c1d;
+    --tag-pk-bg: #faece7;
+    --mono: 'SF Mono', 'Consolas', 'Menlo', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18;
+      --bg-alt: #232320;
+      --border: #3a3a36;
+      --text: #e8e6df;
+      --text-secondary: #b4b2a9;
+      --text-tertiary: #888780;
+      --accent: #85b7eb;
+      --accent-bg: #0c447c;
+      --code-bg: #2c2c2a;
+      --tag-fk: #9fe1cb;
+      --tag-fk-bg: #085041;
+      --tag-pk: #f0997b;
+      --tag-pk-bg: #712b13;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+  }
+  .wrap {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 48px 24px 100px;
+  }
+  header {
+    margin-bottom: 40px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+  .subtitle {
+    color: var(--text-secondary);
+    font-size: 15px;
+    margin: 0;
+  }
+  .toc {
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 40px;
+  }
+  .toc h2 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-tertiary);
+    margin: 0 0 12px;
+  }
+  .toc ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 24px;
+  }
+  .toc a {
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 14px;
+  }
+  .toc a:hover { text-decoration: underline; }
+  .flow-note {
+    background: var(--accent-bg);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 40px;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .flow-note strong { display: block; margin-bottom: 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.03em; opacity: 0.8;}
+  section.table-block {
+    margin-bottom: 56px;
+    padding-top: 8px;
+  }
+  .table-header {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .table-name {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .table-group {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-tertiary);
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 6px;
+  }
+  .purpose {
+    color: var(--text-secondary);
+    font-size: 15px;
+    margin: 6px 0 20px;
+    max-width: 700px;
+  }
+  .panel {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 18px;
+  }
+  .panel-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-tertiary);
+    padding: 10px 16px;
+    background: var(--bg-alt);
+    border-bottom: 1px solid var(--border);
+  }
+  pre {
+    margin: 0;
+    padding: 16px;
+    overflow-x: auto;
+    background: var(--code-bg);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.data-table th, table.data-table td {
+    text-align: left;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    font-family: var(--mono);
+  }
+  table.data-table th {
+    background: var(--bg-alt);
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  table.data-table tr:last-child td { border-bottom: none; }
+  table.data-table td.null { color: var(--text-tertiary); font-style: italic; }
+  .tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .tag-pk { background: var(--tag-pk-bg); color: var(--tag-pk); }
+  .tag-fk { background: var(--tag-fk-bg); color: var(--tag-fk); }
+  .note {
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding: 12px 16px;
+    background: var(--bg-alt);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 8px 8px 0;
+    margin-top: 12px;
+  }
+  footer {
+    margin-top: 60px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    color: var(--text-tertiary);
+    font-size: 13px;
+  }
+  .copy-btn {
+    font-size: 11px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-secondary);
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    float: right;
+    margin: 6px 12px 0 0;
+  }
+  .copy-btn:hover { background: var(--bg-alt); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Yaadein — Database Schema Reference</h1>
+    <p class="subtitle">Event photo &amp; video sharing platform — Postgres / Supabase. Anonymous guest uploads, post-expiry face grouping.</p>
+  </header>
+
+  <div class="flow-note">
+    <strong>Core guest flow (no login)</strong>
+    Guest scans QR → app generates a <code>guest_session_id</code> client-side → first time that session is seen, a row is created in <code>guests</code> → if face search is enabled, guest sees a consent checkbox + optional name (writes to <code>face_consents</code>) → guest uploads media (<code>media.guest_session_id</code> set, no <code>users</code> row created) → after <code>events.storage_expires_at</code>, a batch job clusters faces into <code>face_clusters</code>.
+  </div>
+
+  <nav class="toc">
+    <h2>Tables</h2>
+    <ul>
+      <li><a href="#users">users</a></li>
+      <li><a href="#events">events</a></li>
+      <li><a href="#guests">guests</a></li>
+      <li><a href="#media">media</a></li>
+      <li><a href="#payments">payments</a></li>
+      <li><a href="#face_consents">face_consents</a></li>
+      <li><a href="#face_clusters">face_clusters</a></li>
+      <li><a href="#face_embeddings">face_embeddings</a></li>
+      <li><a href="#gallery_cache">gallery_cache</a></li>
+      <li><a href="#qr_codes">qr_codes</a></li>
+      <li><a href="#exports">exports</a></li>
+    </ul>
+  </nav>
+
+  <!-- USERS -->
+  <section class="table-block" id="users">
+    <div class="table-header">
+      <span class="table-name">users</span>
+      <span class="table-group">core</span>
+    </div>
+    <p class="purpose">Only people who actually log in — hosts, photographers, admins. Guests never get a row here; they're identified by a client-generated session ID instead.</p>
+    <div class="panel">
+      <div class="panel-title">DDL</div>
+      <pre>CREATE TABLE users (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  phone           text UNIQUE NOT NULL,
+  name            text,
+  role            text CHECK (role IN ('host','photographer','admin')),
+  auth_provider   text,
+  created_at      timestamptz DEFAULT now()
+);</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Example data</div>
+      <table class="data-table">
+        <tr><th>id <span class="tag tag-pk">PK</span></th><th>phone</th><th>name</th><th>role</th></tr>
+        <tr><td>u1</td><td>+91-98765-43210</td><td>Priya Sharma</td><td>host</td></tr>
+        <tr><td>u2</td><td>+91-99887-66554</td><td>Studio Lens</td><td>photographer</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- EVENTS -->
+  <section class="table-block" id="events">
+    <div class="table-header">
+      <span class="table-name">events</span>
+      <span class="table-group">core</span>
+    </div>
+    <p class="purpose">The tenant boundary. Almost every other table scopes itself to one event — this is the single most important foreign key in the schema.</p>
+    <div class="panel">
+      <div class="panel-title">DDL</div>
+      <pre>CREATE TABLE events (
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  host_id              uuid REFERENCES users(id),
+  slug                 text UNIQUE NOT NULL,
+  face_search_enabled  boolean DEFAULT false,
+  plan                 text CHECK (plan IN ('basic','premium','professional')),
+  storage_expires_at   timestamptz,
+  is_wedding           boolean DEFAULT false,
+  created_at           timestamptz DEFAULT now()
+);</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Example data</div>
+      <table class="data-table">
+        <tr><th>id <span class="tag tag-pk">PK</span></th><th>host_id <span class="tag tag-fk">FK</span></th><th>slug</th><th>face_search_enabled</th><th>plan</th><th>storage_expires_at</th></tr>
+        <tr><td>e1</td><td>u1</td><td>priya-rahul-wedding</td><td>true</td><td>premium</td><td>2027-06-22</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- GUESTS -->
+  <section class="table-block" id="guests">
+    <div class="table-header">
+      <span class="table-name">guests</span>
+      <span class="table-group">core</span>
+    </div>
+    <p class="purpose">One row per anonymous attendee, keyed off their client-generated <code>guest_session_id</code>. Created the first time that session is seen (consent screen or first upload, whichever comes first). Gives analytics, repeat-visit tracking, and a single place to store a guest's self-typed name/phone instead of duplicating it across <code>face_consents</code> and <code>face_clusters</code>.</p>
+    <div class="panel">
+      <div class="panel-title">DDL</div>
+      <pre>CREATE TABLE guests (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id          uuid NOT NULL REFERENCES events(id),
+  guest_session_id  uuid NOT NULL,
+  name              text,
+  phone             text,
+  first_seen_at     timestamptz DEFAULT now(),
+  last_seen_at      timestamptz DEFAULT now(),
+  UNIQUE (event_id, guest_session_id)
+);</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Example data</div>
+      <table class="data-table">
+        <tr><th>id <span class="tag tag-pk">PK</span></th><th>event_id <span class="tag tag-fk">FK</span></th><th>guest_session_id</th><th>name</th><th>phone</th><th>first_seen_at</th></tr>
+        <tr><td>g1</td><td>e1</td><td>gs-7f2a</td><td>Rahul Mehta</td><td>+91-91234-56780</td><td>2026-06-20 14:30</td></tr>
+      </table>
+    </div>
+    <div class="note">Still no login, no password, no auth token — this row exists purely so a session ID isn't scattered raw across three other tables. <code>face_consents.guest_session_id</code> and <code>media.guest_session_id</code> now both resolve back to this table for name/phone lookups.</div>
+  </section>
+
+  <!-- MEDIA -->
+  <section class="table-block" id="media">
+    <div class="table-header">
+      <span class="table-name">media</span>
+      <span class="table-group">core</span>
+    </div>
+    <p class="purpose">One row per uploaded photo/video. Partitioned by <code>event_id</code> since ~95% of queries are event-scoped. Either <code>uploaded_by</code> (logged-in host/photographer) or <code>guest_session_id</code> (anonymous guest) is set — never both. Metadata columns support duplicate detection, download-size estimation, and video processing — all explicit v1 requirements in the steering doc.</p>
+    <div class="panel">
+      <div class="panel-title">DDL</div>
+      <pre>CREATE TABLE media (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id           uuid NOT NULL REFERENCES events(id),
+  uploaded_by        uuid REFERENCES users(id),
+  guest_session_id   uuid,
+  type               text CHECK (type IN ('image','video')),
+  r2_object_key      text NOT NULL,
+  idempotency_key    text NOT NULL,
+  status             text CHECK (status IN ('pending_verify','scanning','processing','visible','rejected')),
+  file_size_bytes    bigint,
+  mime_type          text,
+  checksum           text,
+  width              int,
+  height             int,
+  duration_seconds   int,
+  thumbnail_url      text,
+  created_at         timestamptz DEFAULT now(),
+  UNIQUE (event_id, idempotency_key),
+  CHECK (uploaded_by IS NOT NULL OR guest_session_id IS NOT NULL)
+) PARTITION BY HASH (event_id);</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Example data</div>
+      <table class="data-table">
+        <tr><th>id <span class="tag tag-pk">PK</span></th><th>event_id <span class="tag tag-fk">FK</span></th><th>guest_session_id</th><th>type</th><th>file_size_bytes</th><th>checksum</th><th>width</th><th>height</th><th>status</th></tr>
+        <tr><td>m1</td><td>e1</td><td>gs-7f2a</td><td>image</td><td>4213880</td><td>a1f9c3...</td><td>4032</td><td>3024</td><td>visible</td></tr>
+        <tr><td>m2</td><td>e1</td><td class="null">null</td><td>video</td><td>118293440</td><td>e02b71...</td><td>1920</td><td>1080</td><td>processing</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- PAYMENTS -->
+  <section class="table-block" id="payments">
+    <div class="table-header">
+      <span class="table-name">payments</span>
+      <span class="table-group">core</span>
+    </div>
+    <p class="purpose">Transaction and upgrade audit trail. <code>upgrade_trigger</code> records <em>why</em> a payment happened (e.g. overage), not just the amount — needed for the overage policy where uploads never get hard-blocked.</p>
+    <div class="panel">
+      <div class="panel-title">DDL</div>
+      <pre>CREATE TABLE payments (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         uuid REFERENCES users(id),
+  event_id        uuid REFERENCES events(id),
+  plan            text,
+  amount          numeric,
+  status          text CHECK (status IN ('pending','success','failed','refunded')),
+  upgrade_trigger text,
+  created_at      timestamptz DEFAULT now()
+);</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Example data</div>
+      <table class="data-table">
+        <tr><th>id <span class="tag tag-pk">PK</span></th><th>user_id <span class="tag tag-fk">FK</span></th><th>event_id <span class="tag tag-fk">FK</span></th><th>plan</th><th>amount</th><th>status</th><th>upgrade_trigger</th></tr>
+        <tr><td>p1</td><td>u1</td><td>e1</td><td>premium</td><td>4999</td><td>success</td><td>manual</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- FACE_CONSENTS -->
+  <section class="table-block" id="face_consents">
+    <div class="table-header">
+      <span class="table-name">face_consents</span>
+      <span class="table-group">face recognition</span>
+    </div>
+    <p class="purpose">The compliance anchor for DPDP Act biometric rules. Tied to <code>guest_session_id</code>, not a user account, so consent can be proven even for guests who never log in — and survives the embedding's eventual purge.</p>
+    <div class="panel">
+      <div class="panel-title">DDL</div>
+      <pre>CREATE TABLE face_consents (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id            uuid NOT NULL REFERENCES events(id),
+  guest_session_id    uuid NOT NULL,
+  guest_name          text,
+  consent_given_at    timestamptz NOT NULL,
+  consent_revoked_at  timestamptz,
+  purge_executed_at   timestamptz
+);</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Example data</div>
+      <table class="data-table">
+        <tr><th>id <span class="tag tag-pk">PK</span></th><th>event_id <span class="tag tag-fk">FK</span></th><th>guest_session_id</th><th>guest_name</th><th>consent_given_at</th></tr>
+        <tr><td>fc1</td><td>e1</td><td>gs-7f2a</td><td>Rahul Mehta</td><td>2026-06-20 14:32</td></tr>
+      </table>
+    </div>
+    <div class="note">Set the first time a guest opens the upload UI for a face-search-enabled event — before any media is uploaded.</div>
+  </section>
+
+  <!-- FACE_CLUSTERS -->
+  <section class="table-block" id="face_clusters">
+    <div class="table-header">
+      <span class="table-name">face_clusters</span>
+      <span class="table-group">face recognition</span>
+    </div>
+    <p class="purpose">One row per distinct person detected within an event, created by the post-expiry batch clustering job. <code>matched_guest_session_id</code> is only set if the cluster turns out to be a consenting guest's own self-tagged face.</p>
+    <div class="panel">
+      <div class="panel-title">DDL</div>
+      <pre>CREATE TABLE face_clusters (
+  id                        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id                  uuid NOT NULL REFERENCES events(id),
+  matched_guest_session_id  uuid,
+  matched_guest_name        text,
+  cover_thumbnail_url       text
+);</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Example data</div>
+      <table class="data-table">
+        <tr><th>id <span class="tag tag-pk">PK</span></th><th>event_id <span class="tag tag-fk">FK</span></th><th>matched_guest_session_id</th><th>matched_guest_name</th><th>cover_thumbnail_url</th></tr>
+        <tr><td>cl1</td><td>e1</td><td>gs-7f2a</td><td>Rahul Mehta</td><td>events/e1/thumbs/cl1.jpg</td></tr>
+        <tr><td>cl2</td><td>e1</td><td class="null">null</td><td class="null">null</td><td>events/e1/thumbs/cl2.jpg</td></tr>
+      </table>
+    </div>
+    <div class="note">cl2 is an unregistered face — appears in photos, never went through the consent flow itself (e.g. a guest who didn't open the upload UI). Matching is informational only and never implies that person consented.</div>
+  </section>
+
+  <!-- FACE_EMBEDDINGS -->
+  <section class="table-block" id="face_embeddings">
+    <div class="table-header">
+      <span class="table-name">face_embeddings</span>
+      <span class="table-group">face recognition</span>
+    </div>
+    <p class="purpose">One row per detected face per photo. <code>cluster_id</code> stays null until the batch job runs post-expiry. pgvector-indexed and scoped by <code>event_id</code> so similarity search can never cross events. <code>uploader_consent_id</code> records that <em>the uploader's session</em> consented to face search on this photo — it does <strong>not</strong> claim that every face detected in the photo belongs to a consenting person. A single image can contain many faces from only one consenting uploader.</p>
+    <div class="panel">
+      <div class="panel-title">DDL</div>
+      <pre>CREATE TABLE face_embeddings (
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id             uuid NOT NULL REFERENCES events(id),
+  media_id             uuid REFERENCES media(id),
+  embedding            vector(512),
+  cluster_id           uuid REFERENCES face_clusters(id),
+  uploader_consent_id  uuid NOT NULL REFERENCES face_consents(id),
+  purge_at             timestamptz NOT NULL,
+  created_at           timestamptz DEFAULT now()
+);
+
+CREATE INDEX ON face_embeddings USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX ON face_embeddings (event_id, cluster_id);</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Example data</div>
+      <table class="data-table">
+        <tr><th>id <span class="tag tag-pk">PK</span></th><th>event_id <span class="tag tag-fk">FK</span></th><th>media_id <span class="tag tag-fk">FK</span></th><th>embedding</th><th>cluster_id <span class="tag tag-fk">FK</span></th><th>uploader_consent_id <span class="tag tag-fk">FK</span></th><th>purge_at</th></tr>
+        <tr><td>fe1</td><td>e1</td><td>m1</td><td>[0.0231, -0.114, ...]</td><td>cl1</td><td>fc1</td><td>2027-06-22</td></tr>
+        <tr><td>fe2</td><td>e1</td><td>m2</td><td>[0.0512, 0.0341, ...]</td><td>cl2</td><td>fc1</td><td>2027-06-22</td></tr>
+      </table>
+    </div>
+    <div class="note">fe2's face (cluster cl2) belongs to someone who never went through consent themselves — only the uploader did. The column name now says exactly that, instead of implying every face in the row was consented-to.</div>
+  </section>
+
+  <!-- GALLERY_CACHE -->
+  <section class="table-block" id="gallery_cache">
+    <div class="table-header">
+      <span class="table-name">gallery_cache</span>
+      <span class="table-group">supporting</span>
+    </div>
+    <p class="purpose">Offloads hot-event gallery reads from Postgres. Refreshed on write, not read — a "hot wedding" shouldn't hammer the primary database on every page load.</p>
+    <div class="panel">
+      <div class="panel-title">DDL</div>
+      <pre>CREATE TABLE gallery_cache (
+  event_id        uuid PRIMARY KEY REFERENCES events(id),
+  cached_payload  jsonb,
+  refreshed_at    timestamptz
+);</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Example data</div>
+      <table class="data-table">
+        <tr><th>event_id <span class="tag tag-pk">PK</span> <span class="tag tag-fk">FK</span></th><th>cached_payload</th><th>refreshed_at</th></tr>
+        <tr><td>e1</td><td>{"media_ids": ["m1","m2"], "count": 2}</td><td>2026-06-22 10:00</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- QR_CODES -->
+  <section class="table-block" id="qr_codes">
+    <div class="table-header">
+      <span class="table-name">qr_codes</span>
+      <span class="table-group">supporting</span>
+    </div>
+    <p class="purpose">Tracks the scan → upload conversion funnel as its own entity, separate from event metadata.</p>
+    <div class="panel">
+      <div class="panel-title">DDL</div>
+      <pre>CREATE TABLE qr_codes (
+  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id        uuid NOT NULL REFERENCES events(id),
+  scan_count      int DEFAULT 0,
+  unique_visitors int DEFAULT 0
+);</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Example data</div>
+      <table class="data-table">
+        <tr><th>id <span class="tag tag-pk">PK</span></th><th>event_id <span class="tag tag-fk">FK</span></th><th>scan_count</th><th>unique_visitors</th></tr>
+        <tr><td>qr1</td><td>e1</td><td>340</td><td>280</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- EXPORTS -->
+  <section class="table-block" id="exports">
+    <div class="table-header">
+      <span class="table-name">exports</span>
+      <span class="table-group">supporting</span>
+    </div>
+    <p class="purpose">Lifecycle tracking for async ZIP/album download jobs — exports are Celery jobs, not media rows.</p>
+    <div class="panel">
+      <div class="panel-title">DDL</div>
+      <pre>CREATE TABLE exports (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id      uuid NOT NULL REFERENCES events(id),
+  requested_by  uuid REFERENCES users(id),
+  scope         text CHECK (scope IN ('single','album','full_event')),
+  status        text CHECK (status IN ('queued','processing','ready','failed')),
+  download_url  text
+);</pre>
+    </div>
+    <div class="panel">
+      <div class="panel-title">Example data</div>
+      <table class="data-table">
+        <tr><th>id <span class="tag tag-pk">PK</span></th><th>event_id <span class="tag tag-fk">FK</span></th><th>requested_by <span class="tag tag-fk">FK</span></th><th>scope</th><th>status</th><th>download_url</th></tr>
+        <tr><td>ex1</td><td>e1</td><td>u1</td><td>full_event</td><td>ready</td><td>r2.cdn/exports/ex1.zip</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    Yaadein — event photo &amp; video sharing platform. Schema reflects v1 scope: anonymous guest uploads via session ID (backed by a <code>guests</code> table), media metadata for dedup/transcoding, post-expiry batch face grouping with uploader-level (not per-face) consent semantics.
+  </footer>
+
+</div>
+</body>
+</html>
