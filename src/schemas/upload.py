@@ -1,5 +1,5 @@
 import uuid
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 class UploadPresignFile(BaseModel):
     client_file_id: str

@@ -1,16 +1,14 @@
 from datetime import datetime, timezone
 import uuid
-import pytest
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.user import User, AuthUser
-from src.models.event import Event, GalleryCache, QRCode
+from src.models.event import Event
 from src.models.guest import Guest
-from src.models.media import Media, Export
+from src.models.media import Media
 from src.models.face import FaceConsent, FaceCluster, FaceEmbedding
 from src.models.album import Album, AlbumMedia
-from src.models.payment import Payment
 
 
 async def test_supabase_auth_sync_trigger(db_session: AsyncSession):

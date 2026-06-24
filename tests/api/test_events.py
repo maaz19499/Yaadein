@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
-from src.models.user import AuthUser, User
+from src.models.user import AuthUser
 from src.models.event import Event
 
 

@@ -1,9 +1,8 @@
 import io
-import os
 import uuid
 import zipfile
 from datetime import datetime, timezone
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import pytest
 from fastapi import status
 from fastapi.testclient import TestClient

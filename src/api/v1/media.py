@@ -1,5 +1,4 @@
 import os
-import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -71,7 +70,7 @@ async def confirm_media_upload(
     if payload.r2_upload_id:
         try:
             storage_service.complete_multipart_upload(payload.r2_object_key, payload.r2_upload_id)
-        except ClientError as e:
+        except ClientError:
             # If it failed to complete, maybe it was already completed
             # Let's log it or proceed to head_object check
             pass

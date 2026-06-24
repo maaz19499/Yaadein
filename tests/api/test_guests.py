@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 import uuid
 import pytest
 from fastapi import status
@@ -6,7 +5,6 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.user import AuthUser
 from src.models.event import Event
 from src.models.guest import Guest
 from src.models.face import FaceConsent

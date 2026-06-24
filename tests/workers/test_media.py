@@ -1,6 +1,6 @@
 import io
 import uuid
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import pytest
 from PIL import Image
 from sqlalchemy import select

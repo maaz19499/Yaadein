@@ -7,7 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.event import Event
-from src.models.guest import Guest
 from src.models.media import Media
 from tests.api.test_events import create_test_user, delete_test_user
 
@@ -193,7 +192,7 @@ async def test_media_confirm_success_and_idempotency(client: TestClient, db_sess
             "ETag": '"etag-checksum-value"',
         }
 
-        with patch("src.services.storage.R2StorageService.head_object", return_value=mock_head) as mock_head_method:
+        with patch("src.services.storage.R2StorageService.head_object", return_value=mock_head):
             with patch("src.workers.tasks.media.process_image_upload.delay") as mock_celery:
                 response = client.post(
                     "/api/v1/media/confirm",

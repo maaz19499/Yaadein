@@ -25,8 +25,6 @@ class FaceEmbeddingService:
 
         # Fallback to deterministic mock embeddings
         sha = hashlib.sha256(image_bytes).hexdigest()
-        # Seed RNG with the hash of the image bytes
-        rng = random.Random(int(sha, 16))
         
         # Deterministically decide if we have 1 or 2 faces in this mock photo
         num_faces = 1 if int(sha[0], 16) % 2 == 0 else 2

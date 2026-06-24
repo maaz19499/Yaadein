@@ -4,7 +4,6 @@ import jwt
 import pytest
 from fastapi import FastAPI, Depends, status
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession
 from src.config import settings
 from src.api.deps import get_current_user, get_db
 from src.models.user import User

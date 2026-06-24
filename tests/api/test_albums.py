@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.event import Event
 from src.models.media import Media
-from src.models.guest import Guest
 from src.models.face import FaceConsent, FaceEmbedding, FaceCluster
 from src.models.album import Album, AlbumMedia
 from tests.api.test_events import create_test_user, delete_test_user
