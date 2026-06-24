@@ -1,7 +1,14 @@
 from datetime import datetime
 import uuid
 from typing import Any
-from sqlalchemy import String, DateTime, ForeignKey, PrimaryKeyConstraint, ForeignKeyConstraint, func
+from sqlalchemy import (
+    String,
+    DateTime,
+    ForeignKey,
+    PrimaryKeyConstraint,
+    ForeignKeyConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from src.models.base import Base
@@ -17,11 +24,17 @@ class Album(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(default=uuid.uuid4)
-    event_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("events.id", ondelete="CASCADE"), nullable=False)
+    event_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("events.id", ondelete="CASCADE"), nullable=False
+    )
     name: Mapped[str] = mapped_column(String, nullable=False)
-    type: Mapped[str | None] = mapped_column(String, nullable=True)  # CHECK (type IN ('static', 'dynamic'))
+    type: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )  # CHECK (type IN ('static', 'dynamic'))
     dynamic_filters: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class AlbumMedia(Base):
@@ -46,4 +59,6 @@ class AlbumMedia(Base):
     event_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
     album_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
     media_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

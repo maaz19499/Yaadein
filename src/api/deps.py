@@ -35,7 +35,9 @@ async def get_current_user(
             token,
             settings.SUPABASE_JWT_SECRET,
             algorithms=["HS256"],
-            options={"verify_aud": False},  # Supabase uses custom audience claims (e.g. 'authenticated')
+            options={
+                "verify_aud": False
+            },  # Supabase uses custom audience claims (e.g. 'authenticated')
         )
     except jwt.PyJWTError as e:
         raise HTTPException(
@@ -133,4 +135,3 @@ async def get_upload_identity(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Authentication required. Provide either standard Bearer JWT or guest headers (X-Guest-Session-ID and X-Event-ID).",
     )
-

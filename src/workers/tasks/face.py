@@ -31,9 +31,7 @@ async def _async_generate_face_embeddings(
             return  # Skip processing if media doesn't exist or is not visible
 
         # 2. Fetch Event and ensure face search is enabled
-        event_result = await session.execute(
-            select(Event).where(Event.id == event_id)
-        )
+        event_result = await session.execute(select(Event).where(Event.id == event_id))
         event = event_result.scalar_one_or_none()
         if not event or not event.face_search_enabled:
             return  # Skip processing if event has face search disabled
@@ -59,15 +57,19 @@ async def _async_generate_face_embeddings(
             try:
                 image_bytes = storage_service.get_object_body(media.r2_object_key)
             except Exception:
-                raise ValueError(f"Could not download file from key {preview_key} or {media.r2_object_key}")
+                raise ValueError(
+                    f"Could not download file from key {preview_key} or {media.r2_object_key}"
+                )
 
         # 5. Extract face embeddings
         face_service = FaceEmbeddingService()
         embeddings = face_service.generate_embeddings(image_bytes)
 
         # 6. Save face embedding records to DB
-        purge_at = event.storage_expires_at or (datetime.now(timezone.utc) + timedelta(days=30))
-        
+        purge_at = event.storage_expires_at or (
+            datetime.now(timezone.utc) + timedelta(days=30)
+        )
+
         for emb in embeddings:
             db_embedding = FaceEmbedding(
                 event_id=event_id,
@@ -118,7 +120,9 @@ async def cluster_faces_for_event(event_id: uuid.UUID) -> None:
         # Process each cluster group
         for label, group_embs in groups.items():
             # Find if any embeddings in this cluster group already have an assigned cluster ID
-            existing_cluster_ids = {e.cluster_id for e in group_embs if e.cluster_id is not None}
+            existing_cluster_ids = {
+                e.cluster_id for e in group_embs if e.cluster_id is not None
+            }
 
             cluster_id = None
             if existing_cluster_ids:
@@ -139,7 +143,9 @@ async def cluster_faces_for_event(event_id: uuid.UUID) -> None:
             if group_embs:
                 first_emb = group_embs[0]
                 media_res = await session.execute(
-                    select(Media).where(Media.event_id == event_id, Media.id == first_emb.media_id)
+                    select(Media).where(
+                        Media.event_id == event_id, Media.id == first_emb.media_id
+                    )
                 )
                 media = media_res.scalar_one_or_none()
                 if media and media.thumbnail_url:

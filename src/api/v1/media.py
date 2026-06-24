@@ -13,7 +13,11 @@ from src.services.storage import R2StorageService
 router = APIRouter(tags=["media"])
 
 
-@router.post("/confirm", response_model=MediaConfirmResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post(
+    "/confirm",
+    response_model=MediaConfirmResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
 async def confirm_media_upload(
     payload: MediaConfirmRequest,
     identity: UploadIdentity = Depends(get_upload_identity),
@@ -21,6 +25,7 @@ async def confirm_media_upload(
 ) -> MediaConfirmResponse:
     # 1. Authorize access to event
     from src.models.event import Event
+
     if identity.user_id:
         # Standard user check (host/admin)
         event_res = await db.execute(select(Event).where(Event.id == payload.event_id))
@@ -69,7 +74,9 @@ async def confirm_media_upload(
     storage_service = R2StorageService()
     if payload.r2_upload_id:
         try:
-            storage_service.complete_multipart_upload(payload.r2_object_key, payload.r2_upload_id)
+            storage_service.complete_multipart_upload(
+                payload.r2_object_key, payload.r2_upload_id
+            )
         except ClientError:
             # If it failed to complete, maybe it was already completed
             # Let's log it or proceed to head_object check
@@ -118,6 +125,7 @@ async def confirm_media_upload(
     # We pass the parameters as strings to Celery for serialization safety
     if media_type == "image":
         from src.workers.tasks.media import process_image_upload
+
         process_image_upload.delay(str(payload.event_id), str(new_media.id))
     else:
         # Placeholder/stub for video processing or just mark it as visible or call a video task

@@ -2,6 +2,7 @@ import hashlib
 import random
 import numpy as np
 
+
 class FaceEmbeddingService:
     """
     Service to handle face detection, embedding extraction, and face clustering.
@@ -25,17 +26,17 @@ class FaceEmbeddingService:
 
         # Fallback to deterministic mock embeddings
         sha = hashlib.sha256(image_bytes).hexdigest()
-        
+
         # Deterministically decide if we have 1 or 2 faces in this mock photo
         num_faces = 1 if int(sha[0], 16) % 2 == 0 else 2
-        
+
         embeddings = []
         for i in range(num_faces):
             # Generate a 512-dimension mock vector coordinates
             # Using i in seed variation to generate different vectors for different faces
             rng_face = random.Random(int(sha, 16) + i)
             vector = [rng_face.gauss(0, 1) for _ in range(512)]
-            
+
             # Normalize to unit length (L2 norm) for cosine distance
             norm = sum(x * x for x in vector) ** 0.5
             if norm > 0:
@@ -43,9 +44,9 @@ class FaceEmbeddingService:
             else:
                 vector = [0.0] * 512
                 vector[0] = 1.0
-                
+
             embeddings.append(vector)
-            
+
         return embeddings
 
     def cluster_embeddings(

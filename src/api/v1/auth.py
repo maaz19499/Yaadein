@@ -92,7 +92,9 @@ async def register_guest(
             consent.consent_revoked_at = now
             # Immediately delete any existing face embeddings for this consent to comply with DPDP
             await db.execute(
-                delete(FaceEmbedding).where(FaceEmbedding.uploader_consent_id == consent.id)
+                delete(FaceEmbedding).where(
+                    FaceEmbedding.uploader_consent_id == consent.id
+                )
             )
 
     await db.commit()
@@ -101,12 +103,12 @@ async def register_guest(
     if should_backfill and consent and event.face_search_enabled:
         from src.models.media import Media
         from src.workers.tasks.face import generate_face_embeddings
-        
+
         media_result = await db.execute(
             select(Media).where(
                 Media.event_id == event_id,
                 Media.guest_session_id == guest_in.guest_session_id,
-                Media.status == "visible"
+                Media.status == "visible",
             )
         )
         visible_medias = media_result.scalars().all()

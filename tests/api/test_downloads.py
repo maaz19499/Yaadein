@@ -71,6 +71,7 @@ async def test_download_media_success(client: TestClient, db_session: AsyncSessi
 
         # Clean up
         from sqlalchemy import delete
+
         await db_session.execute(delete(Media).where(Media.event_id == event_id))
         await db_session.delete(event)
         await db_session.commit()
@@ -79,7 +80,9 @@ async def test_download_media_success(client: TestClient, db_session: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_download_media_overage_limits(client: TestClient, db_session: AsyncSession):
+async def test_download_media_overage_limits(
+    client: TestClient, db_session: AsyncSession
+):
     # Setup host and event
     host_id, headers = await create_test_user(db_session, "Host Priya", "host")
 
@@ -173,6 +176,7 @@ async def test_download_media_overage_limits(client: TestClient, db_session: Asy
 
         # Clean up
         from sqlalchemy import delete
+
         await db_session.execute(delete(Media).where(Media.event_id == event_id))
         await db_session.delete(event)
         await db_session.commit()
@@ -227,6 +231,7 @@ async def test_exports_api_flow(client: TestClient, db_session: AsyncSession):
 
         # Clean up
         from sqlalchemy import delete
+
         await db_session.execute(delete(Export).where(Export.event_id == event_id))
         await db_session.delete(event)
         await db_session.commit()
@@ -342,6 +347,7 @@ async def test_generate_zip_export_task(db_session: AsyncSession):
 
         # Clean up
         from sqlalchemy import delete
+
         await db_session.execute(delete(Export).where(Export.event_id == event_id))
         await db_session.execute(delete(Media).where(Media.event_id == event_id))
         await db_session.delete(event)

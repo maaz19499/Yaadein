@@ -40,7 +40,9 @@ async def test_presign_urls_host_success(client: TestClient, db_session: AsyncSe
                 {
                     "client_file_id": "temp-file-over-10",
                     "file_name": "dance_video.mp4",
-                    "file_size_bytes": 25 * 1024 * 1024,  # 25MB -> 3 parts (10MB, 10MB, 5MB)
+                    "file_size_bytes": 25
+                    * 1024
+                    * 1024,  # 25MB -> 3 parts (10MB, 10MB, 5MB)
                     "mime_type": "video/mp4",
                     "checksum": "sha256-67890",
                 },
@@ -51,8 +53,12 @@ async def test_presign_urls_host_success(client: TestClient, db_session: AsyncSe
         with patch("src.services.storage.boto3.client") as mock_boto3:
             mock_s3 = MagicMock()
             mock_boto3.return_value = mock_s3
-            mock_s3.create_multipart_upload.return_value = {"UploadId": "mock-upload-id-123"}
-            mock_s3.generate_presigned_url.return_value = "https://mock-r2-url.com/presigned"
+            mock_s3.create_multipart_upload.return_value = {
+                "UploadId": "mock-upload-id-123"
+            }
+            mock_s3.generate_presigned_url.return_value = (
+                "https://mock-r2-url.com/presigned"
+            )
             mock_s3.create_bucket.return_value = {}
 
             response = client.post(
@@ -67,7 +73,9 @@ async def test_presign_urls_host_success(client: TestClient, db_session: AsyncSe
         assert len(data["files"]) == 2
 
         # Assert selfie details
-        selfie = next(f for f in data["files"] if f["client_file_id"] == "temp-file-under-10")
+        selfie = next(
+            f for f in data["files"] if f["client_file_id"] == "temp-file-under-10"
+        )
         assert selfie["r2_upload_id"] is None
         assert selfie["chunk_size_bytes"] is None
         assert len(selfie["chunks"]) == 1
@@ -76,14 +84,18 @@ async def test_presign_urls_host_success(client: TestClient, db_session: AsyncSe
         assert selfie["idempotency_key"] is not None
 
         # Assert video details
-        video = next(f for f in data["files"] if f["client_file_id"] == "temp-file-over-10")
+        video = next(
+            f for f in data["files"] if f["client_file_id"] == "temp-file-over-10"
+        )
         assert video["r2_upload_id"] == "mock-upload-id-123"
         assert video["chunk_size_bytes"] == 10 * 1024 * 1024
         assert len(video["chunks"]) == 3
         assert [c["part_number"] for c in video["chunks"]] == [1, 2, 3]
 
         # 3. Clean up event
-        event_result = await db_session.execute(select(Event).where(Event.id == event_id))
+        event_result = await db_session.execute(
+            select(Event).where(Event.id == event_id)
+        )
         db_event = event_result.scalar_one()
         await db_session.delete(db_event)
         await db_session.commit()
@@ -137,7 +149,9 @@ async def test_presign_urls_guest_success(client: TestClient, db_session: AsyncS
         with patch("src.services.storage.boto3.client") as mock_boto3:
             mock_s3 = MagicMock()
             mock_boto3.return_value = mock_s3
-            mock_s3.generate_presigned_url.return_value = "https://mock-r2-url.com/presigned"
+            mock_s3.generate_presigned_url.return_value = (
+                "https://mock-r2-url.com/presigned"
+            )
             mock_s3.create_bucket.return_value = {}
 
             response = client.post(
@@ -152,7 +166,9 @@ async def test_presign_urls_guest_success(client: TestClient, db_session: AsyncS
         assert data["files"][0]["client_file_id"] == "temp-file-guest"
 
         # 4. Clean up event
-        event_result = await db_session.execute(select(Event).where(Event.id == event_id))
+        event_result = await db_session.execute(
+            select(Event).where(Event.id == event_id)
+        )
         db_event = event_result.scalar_one()
         await db_session.delete(db_event)
         await db_session.commit()
@@ -161,7 +177,9 @@ async def test_presign_urls_guest_success(client: TestClient, db_session: AsyncS
 
 
 @pytest.mark.asyncio
-async def test_media_confirm_success_and_idempotency(client: TestClient, db_session: AsyncSession):
+async def test_media_confirm_success_and_idempotency(
+    client: TestClient, db_session: AsyncSession
+):
     # 1. Setup host user and event
     host_id, headers = await create_test_user(db_session, "Host Priya", "host")
 
@@ -192,8 +210,12 @@ async def test_media_confirm_success_and_idempotency(client: TestClient, db_sess
             "ETag": '"etag-checksum-value"',
         }
 
-        with patch("src.services.storage.R2StorageService.head_object", return_value=mock_head):
-            with patch("src.workers.tasks.media.process_image_upload.delay") as mock_celery:
+        with patch(
+            "src.services.storage.R2StorageService.head_object", return_value=mock_head
+        ):
+            with patch(
+                "src.workers.tasks.media.process_image_upload.delay"
+            ) as mock_celery:
                 response = client.post(
                     "/api/v1/media/confirm",
                     json=confirm_payload,
@@ -203,10 +225,13 @@ async def test_media_confirm_success_and_idempotency(client: TestClient, db_sess
                 data = response.json()
                 assert data["status"] == "pending_verify"
                 assert "queued" in data["message"]
-                
+
                 # Assert database entry was created
                 db_res = await db_session.execute(
-                    select(Media).where(Media.event_id == event_id, Media.idempotency_key == idempotency_key)
+                    select(Media).where(
+                        Media.event_id == event_id,
+                        Media.idempotency_key == idempotency_key,
+                    )
                 )
                 db_media = db_res.scalar_one_or_none()
                 assert db_media is not None
@@ -235,12 +260,16 @@ async def test_media_confirm_success_and_idempotency(client: TestClient, db_sess
         # 4. Clean up event and media
         # We need to manually delete media first because of composite key constraints
         db_res = await db_session.execute(
-            select(Media).where(Media.event_id == event_id, Media.idempotency_key == idempotency_key)
+            select(Media).where(
+                Media.event_id == event_id, Media.idempotency_key == idempotency_key
+            )
         )
         db_media = db_res.scalar_one()
         await db_session.delete(db_media)
-        
-        event_result = await db_session.execute(select(Event).where(Event.id == event_id))
+
+        event_result = await db_session.execute(
+            select(Event).where(Event.id == event_id)
+        )
         db_event = event_result.scalar_one()
         await db_session.delete(db_event)
         await db_session.commit()

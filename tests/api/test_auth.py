@@ -88,7 +88,7 @@ def test_auth_success(client_with_user):
     }
     token = create_token(payload)
     headers = {"Authorization": f"Bearer {token}"}
-    
+
     response = client_with_user.get("/test-user", headers=headers)
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
@@ -111,7 +111,7 @@ def test_auth_invalid_signature(client_with_user):
     }
     token = create_token(payload, secret="invalid_secret")
     headers = {"Authorization": f"Bearer {token}"}
-    
+
     response = client_with_user.get("/test-user", headers=headers)
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert "Signature verification failed" in response.json()["detail"]
@@ -124,7 +124,7 @@ def test_auth_expired_token(client_with_user):
     }
     token = create_token(payload)
     headers = {"Authorization": f"Bearer {token}"}
-    
+
     response = client_with_user.get("/test-user", headers=headers)
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert "Signature has expired" in response.json()["detail"]
@@ -136,7 +136,7 @@ def test_auth_missing_sub(client_with_user):
     }
     token = create_token(payload)
     headers = {"Authorization": f"Bearer {token}"}
-    
+
     response = client_with_user.get("/test-user", headers=headers)
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert "missing 'sub' claim" in response.json()["detail"]
@@ -149,7 +149,7 @@ def test_auth_user_not_found(client_without_user):
     }
     token = create_token(payload)
     headers = {"Authorization": f"Bearer {token}"}
-    
+
     response = client_without_user.get("/test-user", headers=headers)
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert "User profile not found in public.users" in response.json()["detail"]

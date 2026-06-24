@@ -1,5 +1,12 @@
 from fastapi import FastAPI
-from src.api.v1 import events_router, auth_router, uploads_router, media_router, albums_router, downloads_router
+from src.api.v1 import (
+    events_router,
+    auth_router,
+    uploads_router,
+    media_router,
+    albums_router,
+    downloads_router,
+)
 
 app = FastAPI(
     title="Yaadein API",

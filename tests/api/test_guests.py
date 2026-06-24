@@ -45,7 +45,9 @@ async def test_register_guest_success(client: TestClient, db_session: AsyncSessi
 
         # Assert DB rows exist
         g_result = await db_session.execute(
-            select(Guest).where(Guest.event_id == event_id, Guest.guest_session_id == session_id)
+            select(Guest).where(
+                Guest.event_id == event_id, Guest.guest_session_id == session_id
+            )
         )
         db_guest = g_result.scalar_one_or_none()
         assert db_guest is not None
@@ -53,7 +55,10 @@ async def test_register_guest_success(client: TestClient, db_session: AsyncSessi
         assert db_guest.phone == "+919123456780"
 
         c_result = await db_session.execute(
-            select(FaceConsent).where(FaceConsent.event_id == event_id, FaceConsent.guest_session_id == session_id)
+            select(FaceConsent).where(
+                FaceConsent.event_id == event_id,
+                FaceConsent.guest_session_id == session_id,
+            )
         )
         db_consent = c_result.scalar_one_or_none()
         assert db_consent is not None
@@ -62,7 +67,9 @@ async def test_register_guest_success(client: TestClient, db_session: AsyncSessi
         assert db_consent.consent_revoked_at is None
 
         # Clean up event (cascades to guest and consent)
-        event_result = await db_session.execute(select(Event).where(Event.id == event_id))
+        event_result = await db_session.execute(
+            select(Event).where(Event.id == event_id)
+        )
         db_event = event_result.scalar_one()
         await db_session.delete(db_event)
         await db_session.commit()
@@ -71,7 +78,9 @@ async def test_register_guest_success(client: TestClient, db_session: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_register_guest_reentry_update(client: TestClient, db_session: AsyncSession):
+async def test_register_guest_reentry_update(
+    client: TestClient, db_session: AsyncSession
+):
     host_id, headers = await create_test_user(db_session, "Host Priya", "host")
 
     try:
@@ -112,7 +121,9 @@ async def test_register_guest_reentry_update(client: TestClient, db_session: Asy
 
         # Check DB updates
         g_result = await db_session.execute(
-            select(Guest).where(Guest.event_id == event_id, Guest.guest_session_id == session_id)
+            select(Guest).where(
+                Guest.event_id == event_id, Guest.guest_session_id == session_id
+            )
         )
         db_guest = g_result.scalar_one()
         assert db_guest.name == "Rahul M. Mehta"
@@ -133,13 +144,18 @@ async def test_register_guest_reentry_update(client: TestClient, db_session: Asy
 
         # Check DB revocation
         c_result = await db_session.execute(
-            select(FaceConsent).where(FaceConsent.event_id == event_id, FaceConsent.guest_session_id == session_id)
+            select(FaceConsent).where(
+                FaceConsent.event_id == event_id,
+                FaceConsent.guest_session_id == session_id,
+            )
         )
         db_consent = c_result.scalar_one()
         assert db_consent.consent_revoked_at is not None
 
         # Clean up
-        event_result = await db_session.execute(select(Event).where(Event.id == event_id))
+        event_result = await db_session.execute(
+            select(Event).where(Event.id == event_id)
+        )
         db_event = event_result.scalar_one()
         await db_session.delete(db_event)
         await db_session.commit()
@@ -160,5 +176,3 @@ async def test_register_guest_nonexistent_event(client: TestClient):
     )
     assert response.status_code == status.HTTP_404_NOT_FOUND
     assert "Event not found" in response.json()["detail"]
-
-

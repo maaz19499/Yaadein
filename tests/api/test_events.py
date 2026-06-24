@@ -12,14 +12,14 @@ from src.models.user import AuthUser
 from src.models.event import Event
 
 
-async def create_test_user(db: AsyncSession, name: str, role: str) -> tuple[uuid.UUID, dict[str, str]]:
+async def create_test_user(
+    db: AsyncSession, name: str, role: str
+) -> tuple[uuid.UUID, dict[str, str]]:
     user_id = uuid.uuid4()
     phone = f"+91{uuid.uuid4().int % 10000000000:010d}"
-    
+
     auth_user = AuthUser(
-        id=user_id,
-        phone=phone,
-        raw_user_meta_data={"name": name, "role": role}
+        id=user_id, phone=phone, raw_user_meta_data={"name": name, "role": role}
     )
     db.add(auth_user)
     await db.commit()
@@ -105,7 +105,9 @@ async def test_create_event_unauthenticated(client: TestClient):
 
 
 @pytest.mark.asyncio
-async def test_create_event_duplicate_slug(client: TestClient, db_session: AsyncSession):
+async def test_create_event_duplicate_slug(
+    client: TestClient, db_session: AsyncSession
+):
     host_id, headers = await create_test_user(db_session, "Host Priya", "host")
     slug = f"wedding-{uuid.uuid4().hex[:8]}"
 
@@ -144,7 +146,7 @@ async def test_list_events(client: TestClient, db_session: AsyncSession):
     try:
         slug1 = f"slug1-{uuid.uuid4().hex[:8]}"
         slug2 = f"slug2-{uuid.uuid4().hex[:8]}"
-        
+
         response1 = client.post(
             "/api/v1/events",
             json={"slug": slug1, "is_wedding": True},
@@ -155,7 +157,7 @@ async def test_list_events(client: TestClient, db_session: AsyncSession):
             json={"slug": slug2, "is_wedding": False},
             headers=headers,
         )
-        
+
         event1_id = uuid.UUID(response1.json()["id"])
         event2_id = uuid.UUID(response2.json()["id"])
 
@@ -164,7 +166,7 @@ async def test_list_events(client: TestClient, db_session: AsyncSession):
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert len(data) >= 2
-        
+
         slugs = [e["slug"] for e in data]
         assert slug1 in slugs
         assert slug2 in slugs

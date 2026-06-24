@@ -15,7 +15,11 @@ from src.schemas.media import MediaResponse
 router = APIRouter(tags=["albums"])
 
 
-@router.post("/{event_id}/albums", response_model=AlbumResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{event_id}/albums",
+    response_model=AlbumResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def create_album(
     event_id: uuid.UUID,
     album_in: AlbumCreate,
@@ -57,7 +61,9 @@ async def create_album(
         event_id=event_id,
         name=album_in.name,
         type=album_in.type,
-        dynamic_filters=album_in.dynamic_filters if album_in.type == "dynamic" else None,
+        dynamic_filters=album_in.dynamic_filters
+        if album_in.type == "dynamic"
+        else None,
     )
     db.add(new_album)
     await db.flush()
@@ -72,7 +78,7 @@ async def create_album(
             )
         )
         valid_media_ids = [row[0] for row in media_res.fetchall()]
-        
+
         for media_id in valid_media_ids:
             junction = AlbumMedia(
                 event_id=event_id,
@@ -109,7 +115,9 @@ async def list_albums(
         )
 
     albums_res = await db.execute(
-        select(Album).where(Album.event_id == event_id).order_by(Album.created_at.desc())
+        select(Album)
+        .where(Album.event_id == event_id)
+        .order_by(Album.created_at.desc())
     )
     return list(albums_res.scalars().all())
 
@@ -153,7 +161,7 @@ async def get_album_media(
         # Extract cluster IDs from dynamic filters
         dynamic_filters = album.dynamic_filters or {}
         face_cluster_ids = dynamic_filters.get("face_cluster_ids", [])
-        
+
         # Parse to UUIDs
         try:
             face_cluster_uuids = [
@@ -176,12 +184,11 @@ async def get_album_media(
                 Media.event_id == event_id,
                 Media.status == "visible",
                 Media.id.in_(
-                    select(FaceEmbedding.media_id)
-                    .where(
+                    select(FaceEmbedding.media_id).where(
                         FaceEmbedding.event_id == event_id,
                         FaceEmbedding.cluster_id.in_(face_cluster_uuids),
                     )
-                )
+                ),
             )
             .order_by(Media.created_at.desc())
         )

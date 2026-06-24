@@ -5,14 +5,15 @@ Revises: cbc3142fffb5
 Create Date: 2026-06-24 17:52:18.832604
 
 """
+
 from typing import Sequence, Union
 
 from alembic import op
 
 
 # revision identifiers, used by Alembic.
-revision: str = '48c64c1f86af'
-down_revision: Union[str, Sequence[str], None] = 'cbc3142fffb5'
+revision: str = "48c64c1f86af"
+down_revision: Union[str, Sequence[str], None] = "cbc3142fffb5"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

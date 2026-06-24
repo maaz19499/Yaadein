@@ -91,8 +91,9 @@ async def download_media(
     # Enforce size-based limit
     if max_size_bytes is not None:
         size_res = await db.execute(
-            select(func.sum(Media.file_size_bytes))
-            .where(Media.event_id == event_id, Media.created_at < media.created_at)
+            select(func.sum(Media.file_size_bytes)).where(
+                Media.event_id == event_id, Media.created_at < media.created_at
+            )
         )
         size_prior = size_res.scalar() or 0
         if size_prior >= max_size_bytes:

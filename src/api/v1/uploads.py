@@ -37,6 +37,7 @@ async def generate_presigned_urls(
         # We need to fetch the user to check role, or check if we can query it
         # Actually, get_upload_identity has already validated the user is in public.users
         from src.models.user import User
+
         user_res = await db.execute(select(User).where(User.id == identity.user_id))
         user = user_res.scalar_one()
         if event.host_id != identity.user_id and user.role != "admin":
@@ -63,21 +64,26 @@ async def generate_presigned_urls(
     for file in payload.files:
         _, ext = os.path.splitext(file.file_name)
         object_key = f"events/{payload.event_id}/originals/{file.client_file_id}{ext}"
-        
+
         # Calculate unique idempotency key
         unique_str = f"{payload.event_id}-{file.client_file_id}-{identity.guest_session_id or identity.user_id}"
         idempotency_key = f"idem-{hashlib.md5(unique_str.encode()).hexdigest()}"
-        
+
         chunk_size_limit = 10 * 1024 * 1024  # 10MB
 
         if file.file_size_bytes > chunk_size_limit:
             # Multipart upload presigning
-            upload_id, part_urls = storage_service.generate_presigned_multipart_upload_urls(
-                object_key=object_key,
-                file_size=file.file_size_bytes,
+            upload_id, part_urls = (
+                storage_service.generate_presigned_multipart_upload_urls(
+                    object_key=object_key,
+                    file_size=file.file_size_bytes,
+                )
             )
-            chunks = [PresignedChunk(part_number=p["part_number"], url=p["url"]) for p in part_urls]
-            
+            chunks = [
+                PresignedChunk(part_number=p["part_number"], url=p["url"])
+                for p in part_urls
+            ]
+
             files_response.append(
                 PresignFileResponse(
                     client_file_id=file.client_file_id,
@@ -92,7 +98,7 @@ async def generate_presigned_urls(
             # Single-part upload presigning
             url = storage_service.generate_presigned_upload_url(object_key)
             chunks = [PresignedChunk(part_number=1, url=url)]
-            
+
             files_response.append(
                 PresignFileResponse(
                     client_file_id=file.client_file_id,

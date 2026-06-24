@@ -60,27 +60,41 @@ async def test_process_image_upload_task_success(db_session: AsyncSession):
         dummy_image_bytes = generate_dummy_image_bytes()
 
         # 4. Mock R2 storage calls and run the processing task
-        with patch("src.services.storage.R2StorageService.get_object_body", return_value=dummy_image_bytes) as mock_get:
-            with patch("src.services.storage.R2StorageService.upload_bytes") as mock_upload:
-                with patch("src.services.moderation.ModerationService.is_image_safe", return_value=True) as mock_mod:
+        with patch(
+            "src.services.storage.R2StorageService.get_object_body",
+            return_value=dummy_image_bytes,
+        ) as mock_get:
+            with patch(
+                "src.services.storage.R2StorageService.upload_bytes"
+            ) as mock_upload:
+                with patch(
+                    "src.services.moderation.ModerationService.is_image_safe",
+                    return_value=True,
+                ) as mock_mod:
                     # Execute task synchronously
                     await _async_process_image_upload(str(event_id), str(media_id))
-                    
+
                     # Verify R2 helper downloads original image
                     mock_get.assert_called_once_with(r2_object_key)
                     mock_mod.assert_called_once_with(dummy_image_bytes)
-                    
+
                     # Verify R2 helper uploads two WebP formats (thumbnail & preview)
                     assert mock_upload.call_count == 2
-                    
+
                     # Assert thumbnail call arguments
                     first_call_args = mock_upload.call_args_list[0]
-                    assert first_call_args[0][1] == f"events/{event_id}/thumbnails/{media_id}.webp"
+                    assert (
+                        first_call_args[0][1]
+                        == f"events/{event_id}/thumbnails/{media_id}.webp"
+                    )
                     assert first_call_args[0][2] == "image/webp"
-                    
+
                     # Assert preview call arguments
                     second_call_args = mock_upload.call_args_list[1]
-                    assert second_call_args[0][1] == f"events/{event_id}/previews/{media_id}.webp"
+                    assert (
+                        second_call_args[0][1]
+                        == f"events/{event_id}/previews/{media_id}.webp"
+                    )
                     assert second_call_args[0][2] == "image/webp"
 
         # 5. Assert the DB row updates
@@ -100,8 +114,13 @@ async def test_process_image_upload_task_success(db_session: AsyncSession):
 
         # 6. Clean up
         from sqlalchemy import delete
-        await db_session.execute(delete(Media).where(Media.event_id == event_id, Media.id == media_id))
-        event_result = await db_session.execute(select(Event).where(Event.id == event_id))
+
+        await db_session.execute(
+            delete(Media).where(Media.event_id == event_id, Media.id == media_id)
+        )
+        event_result = await db_session.execute(
+            select(Event).where(Event.id == event_id)
+        )
         db_event = event_result.scalar_one()
         await db_session.delete(db_event)
         await db_session.commit()
@@ -110,8 +129,11 @@ async def test_process_image_upload_task_success(db_session: AsyncSession):
         try:
             await db_session.rollback()
             from sqlalchemy import delete
-            await db_session.execute(delete(Media).where(Media.event_id == event_id, Media.id == media_id))
-            
+
+            await db_session.execute(
+                delete(Media).where(Media.event_id == event_id, Media.id == media_id)
+            )
+
             stmt_evt = select(Event).where(Event.id == event_id)
             res_evt = await db_session.execute(stmt_evt)
             e_item = res_evt.scalar_one_or_none()
@@ -164,12 +186,19 @@ async def test_process_image_upload_task_rejected(db_session: AsyncSession) -> N
         dummy_image_bytes = generate_dummy_image_bytes()
 
         # 4. Mock calls and assert rejection logic
-        with patch("src.services.storage.R2StorageService.get_object_body", return_value=dummy_image_bytes):
-            with patch("src.services.storage.R2StorageService.upload_bytes") as mock_upload:
-                with patch("src.services.moderation.ModerationService.is_image_safe", return_value=False):
-                    
+        with patch(
+            "src.services.storage.R2StorageService.get_object_body",
+            return_value=dummy_image_bytes,
+        ):
+            with patch(
+                "src.services.storage.R2StorageService.upload_bytes"
+            ) as mock_upload:
+                with patch(
+                    "src.services.moderation.ModerationService.is_image_safe",
+                    return_value=False,
+                ):
                     await _async_process_image_upload(str(event_id), str(media_id))
-                    
+
                     # Uploads should not be triggered
                     mock_upload.assert_not_called()
 
@@ -183,15 +212,21 @@ async def test_process_image_upload_task_rejected(db_session: AsyncSession) -> N
 
         # 6. Clean up
         from sqlalchemy import delete
-        await db_session.execute(delete(Media).where(Media.event_id == event_id, Media.id == media_id))
+
+        await db_session.execute(
+            delete(Media).where(Media.event_id == event_id, Media.id == media_id)
+        )
         await db_session.delete(event)
         await db_session.commit()
     finally:
         try:
             await db_session.rollback()
             from sqlalchemy import delete
-            await db_session.execute(delete(Media).where(Media.event_id == event_id, Media.id == media_id))
-            
+
+            await db_session.execute(
+                delete(Media).where(Media.event_id == event_id, Media.id == media_id)
+            )
+
             stmt_evt = select(Event).where(Event.id == event_id)
             res_evt = await db_session.execute(stmt_evt)
             e_item = res_evt.scalar_one_or_none()
@@ -256,9 +291,17 @@ async def test_process_image_upload_task_duplicate(db_session: AsyncSession) -> 
         dummy_image_bytes = generate_dummy_image_bytes()
 
         # 4. Upload the first image (unique and safe)
-        with patch("src.services.storage.R2StorageService.get_object_body", return_value=dummy_image_bytes):
-            with patch("src.services.storage.R2StorageService.upload_bytes") as mock_upload:
-                with patch("src.services.moderation.ModerationService.is_image_safe", return_value=True):
+        with patch(
+            "src.services.storage.R2StorageService.get_object_body",
+            return_value=dummy_image_bytes,
+        ):
+            with patch(
+                "src.services.storage.R2StorageService.upload_bytes"
+            ) as mock_upload:
+                with patch(
+                    "src.services.moderation.ModerationService.is_image_safe",
+                    return_value=True,
+                ):
                     await _async_process_image_upload(str(event_id), str(media_id_1))
                     assert mock_upload.call_count == 2
 
@@ -273,9 +316,17 @@ async def test_process_image_upload_task_duplicate(db_session: AsyncSession) -> 
         phash_1 = db_media1.phash
 
         # 5. Upload the second image (same bytes, identical hash, should trigger duplicate status)
-        with patch("src.services.storage.R2StorageService.get_object_body", return_value=dummy_image_bytes):
-            with patch("src.services.storage.R2StorageService.upload_bytes") as mock_upload:
-                with patch("src.services.moderation.ModerationService.is_image_safe", return_value=True):
+        with patch(
+            "src.services.storage.R2StorageService.get_object_body",
+            return_value=dummy_image_bytes,
+        ):
+            with patch(
+                "src.services.storage.R2StorageService.upload_bytes"
+            ) as mock_upload:
+                with patch(
+                    "src.services.moderation.ModerationService.is_image_safe",
+                    return_value=True,
+                ):
                     await _async_process_image_upload(str(event_id), str(media_id_2))
                     # Duplicate upload should not invoke any R2 uploads
                     mock_upload.assert_not_called()
@@ -291,6 +342,7 @@ async def test_process_image_upload_task_duplicate(db_session: AsyncSession) -> 
 
         # 6. Clean up
         from sqlalchemy import delete
+
         await db_session.execute(delete(Media).where(Media.event_id == event_id))
         await db_session.delete(event)
         await db_session.commit()
@@ -298,8 +350,9 @@ async def test_process_image_upload_task_duplicate(db_session: AsyncSession) -> 
         try:
             await db_session.rollback()
             from sqlalchemy import delete
+
             await db_session.execute(delete(Media).where(Media.event_id == event_id))
-            
+
             stmt_evt = select(Event).where(Event.id == event_id)
             res_evt = await db_session.execute(stmt_evt)
             e_item = res_evt.scalar_one_or_none()
@@ -309,5 +362,3 @@ async def test_process_image_upload_task_duplicate(db_session: AsyncSession) -> 
         except Exception:
             pass
         await delete_test_user(db_session, host_id)
-
-

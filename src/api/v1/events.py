@@ -110,9 +110,7 @@ async def update_event(
 
     if event_in.slug is not None and event_in.slug != event.slug:
         # Check slug uniqueness if it changes
-        slug_check = await db.execute(
-            select(Event).where(Event.slug == event_in.slug)
-        )
+        slug_check = await db.execute(select(Event).where(Event.slug == event_in.slug))
         if slug_check.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

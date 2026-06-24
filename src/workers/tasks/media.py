@@ -24,7 +24,9 @@ async def _async_process_image_upload(event_id_str: str, media_id_str: str) -> N
         )
         media = result.scalar_one_or_none()
         if not media:
-            raise ValueError(f"Media record not found for event_id={event_id}, id={media_id}")
+            raise ValueError(
+                f"Media record not found for event_id={event_id}, id={media_id}"
+            )
         r2_object_key = media.r2_object_key
         guest_session_id = media.guest_session_id
 
@@ -77,7 +79,9 @@ async def _async_process_image_upload(event_id_str: str, media_id_str: str) -> N
     storage_service.upload_bytes(preview_bytes, preview_key, "image/webp")
 
     # Construct the thumbnail URL
-    thumbnail_url = f"{settings.R2_ENDPOINT_URL}/{settings.R2_BUCKET_NAME}/{thumbnail_key}"
+    thumbnail_url = (
+        f"{settings.R2_ENDPOINT_URL}/{settings.R2_BUCKET_NAME}/{thumbnail_key}"
+    )
 
     # 9. Update Media record in DB
     async with async_session_maker() as session:
@@ -98,24 +102,26 @@ async def _async_process_image_upload(event_id_str: str, media_id_str: str) -> N
     if guest_session_id:
         from src.models.event import Event
         from src.models.face import FaceConsent
+
         async with async_session_maker() as session:
-            evt_res = await session.execute(
-                select(Event).where(Event.id == event_id)
-            )
+            evt_res = await session.execute(select(Event).where(Event.id == event_id))
             event = evt_res.scalar_one_or_none()
-            
+
             if event and event.face_search_enabled:
                 consent_res = await session.execute(
                     select(FaceConsent).where(
                         FaceConsent.event_id == event_id,
                         FaceConsent.guest_session_id == guest_session_id,
-                        FaceConsent.consent_revoked_at.is_(None)
+                        FaceConsent.consent_revoked_at.is_(None),
                     )
                 )
                 consent = consent_res.scalar_one_or_none()
                 if consent:
                     from src.workers.tasks.face import generate_face_embeddings
-                    generate_face_embeddings.delay(str(event_id), str(media_id), str(consent.id))
+
+                    generate_face_embeddings.delay(
+                        str(event_id), str(media_id), str(consent.id)
+                    )
 
 
 @celery_app.task(name="src.workers.tasks.media.process_image_upload")
@@ -137,9 +143,7 @@ async def _async_generate_zip_export(
     # 1. Update export status to 'processing'
     async with async_session_maker() as session:
         await session.execute(
-            update(Export)
-            .where(Export.id == export_id)
-            .values(status="processing")
+            update(Export).where(Export.id == export_id).values(status="processing")
         )
         await session.commit()
 
@@ -148,8 +152,7 @@ async def _async_generate_zip_export(
         async with async_session_maker() as session:
             if scope == "full_event":
                 media_stmt = select(Media).where(
-                    Media.event_id == event_id,
-                    Media.status == "visible"
+                    Media.event_id == event_id, Media.status == "visible"
                 )
                 media_res = await session.execute(media_stmt)
                 media_items = list(media_res.scalars().all())
@@ -159,7 +162,9 @@ async def _async_generate_zip_export(
                 from src.models.album import AlbumMedia
 
                 album_res = await session.execute(
-                    select(Album).where(Album.event_id == event_id, Album.id == album_id)
+                    select(Album).where(
+                        Album.event_id == event_id, Album.id == album_id
+                    )
                 )
                 album = album_res.scalar_one_or_none()
                 if not album:
@@ -181,21 +186,25 @@ async def _async_generate_zip_export(
                             Media.id.in_(
                                 select(FaceEmbedding.media_id).where(
                                     FaceEmbedding.event_id == event_id,
-                                    FaceEmbedding.cluster_id.in_(face_cluster_uuids)
+                                    FaceEmbedding.cluster_id.in_(face_cluster_uuids),
                                 )
-                            )
+                            ),
                         )
                         media_res = await session.execute(media_stmt)
                         media_items = list(media_res.scalars().all())
                 else:
-                    media_stmt = select(Media).join(
-                        AlbumMedia,
-                        (AlbumMedia.event_id == Media.event_id)
-                        & (AlbumMedia.media_id == Media.id)
-                    ).where(
-                        AlbumMedia.event_id == event_id,
-                        AlbumMedia.album_id == album_id,
-                        Media.status == "visible"
+                    media_stmt = (
+                        select(Media)
+                        .join(
+                            AlbumMedia,
+                            (AlbumMedia.event_id == Media.event_id)
+                            & (AlbumMedia.media_id == Media.id),
+                        )
+                        .where(
+                            AlbumMedia.event_id == event_id,
+                            AlbumMedia.album_id == album_id,
+                            Media.status == "visible",
+                        )
                     )
                     media_res = await session.execute(media_stmt)
                     media_items = list(media_res.scalars().all())
@@ -206,9 +215,7 @@ async def _async_generate_zip_export(
             # If no media items are found, mark as failed
             async with async_session_maker() as session:
                 await session.execute(
-                    update(Export)
-                    .where(Export.id == export_id)
-                    .values(status="failed")
+                    update(Export).where(Export.id == export_id).values(status="failed")
                 )
                 await session.commit()
             return
@@ -247,7 +254,9 @@ async def _async_generate_zip_export(
                 os.remove(tmp_zip_path)
 
         # 5. Generate temporary presigned download URL for the ZIP file (valid for 24 hours)
-        download_url = storage_service.generate_presigned_download_url(export_key, expires_in=86400)
+        download_url = storage_service.generate_presigned_download_url(
+            export_key, expires_in=86400
+        )
 
         # 6. Update export status to 'ready'
         async with async_session_maker() as session:
@@ -261,16 +270,16 @@ async def _async_generate_zip_export(
     except Exception as e:
         async with async_session_maker() as session:
             await session.execute(
-                update(Export)
-                .where(Export.id == export_id)
-                .values(status="failed")
+                update(Export).where(Export.id == export_id).values(status="failed")
             )
             await session.commit()
         raise e
 
 
 @celery_app.task(name="src.workers.tasks.media.generate_zip_export")
-def generate_zip_export(export_id: str, event_id: str, scope: str, album_id: str | None = None) -> None:
+def generate_zip_export(
+    export_id: str, event_id: str, scope: str, album_id: str | None = None
+) -> None:
     """
     Celery task that downloads original media assets for an event or album,
     compresses them into a ZIP archive, and uploads it back to private R2 storage.

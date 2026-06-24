@@ -2,15 +2,18 @@ import uuid
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
+
 class MediaConfirmRequest(BaseModel):
     event_id: uuid.UUID
     idempotency_key: str
     r2_object_key: str
     r2_upload_id: str | None = None
 
+
 class MediaConfirmResponse(BaseModel):
     status: str
     message: str
+
 
 class MediaResponse(BaseModel):
     id: uuid.UUID

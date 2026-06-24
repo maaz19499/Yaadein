@@ -1,6 +1,7 @@
 import uuid
 from pydantic import BaseModel
 
+
 class UploadPresignFile(BaseModel):
     client_file_id: str
     file_name: str
@@ -8,13 +9,16 @@ class UploadPresignFile(BaseModel):
     mime_type: str
     checksum: str | None = None
 
+
 class UploadPresignRequest(BaseModel):
     event_id: uuid.UUID
     files: list[UploadPresignFile]
 
+
 class PresignedChunk(BaseModel):
     part_number: int
     url: str
+
 
 class PresignFileResponse(BaseModel):
     client_file_id: str
@@ -23,6 +27,7 @@ class PresignFileResponse(BaseModel):
     idempotency_key: str
     chunk_size_bytes: int | None = None
     chunks: list[PresignedChunk]
+
 
 class UploadPresignResponse(BaseModel):
     files: list[PresignFileResponse]

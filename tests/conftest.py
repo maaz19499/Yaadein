@@ -21,4 +21,3 @@ def client() -> TestClient:
 async def db_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
         yield session
-

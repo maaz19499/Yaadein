@@ -21,8 +21,7 @@ class ModerationService:
         """
         try:
             response = self.client.detect_moderation_labels(
-                Image={"Bytes": image_bytes},
-                MinConfidence=50.0
+                Image={"Bytes": image_bytes}, MinConfidence=50.0
             )
             labels = response.get("ModerationLabels", [])
             return len(labels) == 0

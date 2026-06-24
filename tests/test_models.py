@@ -17,11 +17,11 @@ async def test_supabase_auth_sync_trigger(db_session: AsyncSession):
     phone = f"+91{uuid.uuid4().int % 10000000000:010d}"
     user_name = "Auth Sync Test Guest"
     user_role = "photographer"
-    
+
     auth_user = AuthUser(
         id=user_id,
         phone=phone,
-        raw_user_meta_data={"name": user_name, "role": user_role}
+        raw_user_meta_data={"name": user_name, "role": user_role},
     )
     db_session.add(auth_user)
     await db_session.commit()
@@ -48,7 +48,7 @@ async def test_full_domain_models_creation(db_session: AsyncSession):
     host_user = AuthUser(
         id=host_id,
         phone=host_phone,
-        raw_user_meta_data={"name": "Host Priya", "role": "host"}
+        raw_user_meta_data={"name": "Host Priya", "role": "host"},
     )
     db_session.add(host_user)
     await db_session.commit()
@@ -60,7 +60,7 @@ async def test_full_domain_models_creation(db_session: AsyncSession):
         slug=event_slug,
         face_search_enabled=True,
         plan="premium",
-        is_wedding=True
+        is_wedding=True,
     )
     db_session.add(event)
     await db_session.commit()
@@ -72,7 +72,7 @@ async def test_full_domain_models_creation(db_session: AsyncSession):
         event_id=event.id,
         guest_session_id=guest_session_id,
         name="Guest Rahul",
-        phone="+919999999999"
+        phone="+919999999999",
     )
     db_session.add(guest)
     await db_session.commit()
@@ -90,7 +90,7 @@ async def test_full_domain_models_creation(db_session: AsyncSession):
         status="pending_verify",
         phash="1" * 64,  # 64-bit binary string
         width=1920,
-        height=1080
+        height=1080,
     )
     db_session.add(media)
     await db_session.commit()
@@ -100,7 +100,7 @@ async def test_full_domain_models_creation(db_session: AsyncSession):
         event_id=event.id,
         guest_session_id=guest_session_id,
         guest_name="Guest Rahul",
-        consent_given_at=datetime.now(timezone.utc)
+        consent_given_at=datetime.now(timezone.utc),
     )
     db_session.add(consent)
     await db_session.flush()
@@ -108,7 +108,7 @@ async def test_full_domain_models_creation(db_session: AsyncSession):
     cluster = FaceCluster(
         event_id=event.id,
         matched_guest_session_id=guest_session_id,
-        matched_guest_name="Guest Rahul"
+        matched_guest_name="Guest Rahul",
     )
     db_session.add(cluster)
     await db_session.flush()
@@ -120,27 +120,19 @@ async def test_full_domain_models_creation(db_session: AsyncSession):
         embedding=[0.1] * 512,
         cluster_id=cluster.id,
         uploader_consent_id=consent.id,
-        purge_at=datetime.now(timezone.utc)
+        purge_at=datetime.now(timezone.utc),
     )
     db_session.add(embedding)
     await db_session.commit()
 
     # 6. Create Album (Partitioned)
-    album = Album(
-        event_id=event.id,
-        name="Rahul's Album",
-        type="static"
-    )
+    album = Album(event_id=event.id, name="Rahul's Album", type="static")
     db_session.add(album)
     await db_session.commit()
     assert album.id is not None
 
     # Create AlbumMedia Junction (Partitioned)
-    album_media = AlbumMedia(
-        event_id=event.id,
-        album_id=album.id,
-        media_id=media.id
-    )
+    album_media = AlbumMedia(event_id=event.id, album_id=album.id, media_id=media.id)
     db_session.add(album_media)
     await db_session.commit()
 
@@ -151,7 +143,9 @@ async def test_full_domain_models_creation(db_session: AsyncSession):
     assert media_res.scalar_one_or_none() is not None
 
     emb_res = await db_session.execute(
-        select(FaceEmbedding).where(FaceEmbedding.event_id == event.id, FaceEmbedding.media_id == media_id)
+        select(FaceEmbedding).where(
+            FaceEmbedding.event_id == event.id, FaceEmbedding.media_id == media_id
+        )
     )
     embedding_row = emb_res.scalar_one_or_none()
     assert embedding_row is not None
@@ -165,7 +159,7 @@ async def test_full_domain_models_creation(db_session: AsyncSession):
         text(
             "SELECT id FROM media WHERE event_id = :event_id AND bit_count(phash # CAST(:incoming_phash AS bit(64))) <= 10"
         ),
-        {"event_id": event.id, "incoming_phash": phash_val}
+        {"event_id": event.id, "incoming_phash": phash_val},
     )
     dup_row = dup_res.all()
     assert len(dup_row) == 1

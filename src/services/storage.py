@@ -4,6 +4,7 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 from src.config import settings
 
+
 class R2StorageService:
     def __init__(self):
         self.s3_client = boto3.client(
@@ -25,7 +26,9 @@ class R2StorageService:
             if error_code not in ("BucketAlreadyExists", "BucketAlreadyOwnedByYou"):
                 raise
 
-    def generate_presigned_upload_url(self, object_key: str, expires_in: int = 3600) -> str:
+    def generate_presigned_upload_url(
+        self, object_key: str, expires_in: int = 3600
+    ) -> str:
         """
         Generates a presigned URL for a single put_object upload.
         """
@@ -54,7 +57,7 @@ class R2StorageService:
         # 2. Calculate chunk/part URLs
         chunk_size = 10 * 1024 * 1024  # 10MB target chunk size
         num_parts = math.ceil(file_size / chunk_size)
-        
+
         part_urls = []
         for part_number in range(1, num_parts + 1):
             url = self.s3_client.generate_presigned_url(
@@ -67,10 +70,12 @@ class R2StorageService:
                 },
                 ExpiresIn=expires_in,
             )
-            part_urls.append({
-                "part_number": part_number,
-                "url": url,
-            })
+            part_urls.append(
+                {
+                    "part_number": part_number,
+                    "url": url,
+                }
+            )
 
         return upload_id, part_urls
 
@@ -85,11 +90,13 @@ class R2StorageService:
         )
         parts = []
         for part in parts_response.get("Parts", []):
-            parts.append({
-                "PartNumber": part["PartNumber"],
-                "ETag": part["ETag"],
-            })
-            
+            parts.append(
+                {
+                    "PartNumber": part["PartNumber"],
+                    "ETag": part["ETag"],
+                }
+            )
+
         # S3 requires the parts list to be sorted by PartNumber
         parts.sort(key=lambda p: p["PartNumber"])
 
@@ -130,7 +137,9 @@ class R2StorageService:
             ContentType=content_type,
         )
 
-    def generate_presigned_download_url(self, object_key: str, expires_in: int = 3600) -> str:
+    def generate_presigned_download_url(
+        self, object_key: str, expires_in: int = 3600
+    ) -> str:
         """
         Generates a presigned URL for downloading an object.
         """
@@ -142,4 +151,3 @@ class R2StorageService:
             },
             ExpiresIn=expires_in,
         )
-

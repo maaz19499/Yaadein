@@ -96,9 +96,7 @@ async def test_albums_lifecycle(client: TestClient, db_session: AsyncSession):
             json={
                 "name": "Groom's Friends",
                 "type": "dynamic",
-                "dynamic_filters": {
-                    "face_cluster_ids": [str(cluster_id)]
-                },
+                "dynamic_filters": {"face_cluster_ids": [str(cluster_id)]},
             },
             headers=headers,
         )
@@ -110,7 +108,9 @@ async def test_albums_lifecycle(client: TestClient, db_session: AsyncSession):
         dynamic_album_id = uuid.UUID(dynamic_data["id"])
 
         # 4. GET /events/{event_id}/albums: List albums as Guest
-        list_res = client.get(f"/api/v1/events/{event_id}/albums", headers=guest_headers)
+        list_res = client.get(
+            f"/api/v1/events/{event_id}/albums", headers=guest_headers
+        )
         assert list_res.status_code == status.HTTP_200_OK
         list_data = list_res.json()
         assert len(list_data) == 2
@@ -129,7 +129,7 @@ async def test_albums_lifecycle(client: TestClient, db_session: AsyncSession):
         # Seed an embedding mapping to the face cluster for media2
         consent_stmt = select(FaceConsent).where(
             FaceConsent.event_id == event_id,
-            FaceConsent.guest_session_id == guest_session_id
+            FaceConsent.guest_session_id == guest_session_id,
         )
         consent_res = await db_session.execute(consent_stmt)
         consent_obj = consent_res.scalar_one()
@@ -173,9 +173,16 @@ async def test_albums_lifecycle(client: TestClient, db_session: AsyncSession):
 
         # Clean up event
         from sqlalchemy import delete
-        await db_session.execute(delete(FaceEmbedding).where(FaceEmbedding.event_id == event_id))
-        await db_session.execute(delete(FaceCluster).where(FaceCluster.event_id == event_id))
-        await db_session.execute(delete(AlbumMedia).where(AlbumMedia.event_id == event_id))
+
+        await db_session.execute(
+            delete(FaceEmbedding).where(FaceEmbedding.event_id == event_id)
+        )
+        await db_session.execute(
+            delete(FaceCluster).where(FaceCluster.event_id == event_id)
+        )
+        await db_session.execute(
+            delete(AlbumMedia).where(AlbumMedia.event_id == event_id)
+        )
         await db_session.execute(delete(Album).where(Album.event_id == event_id))
         await db_session.execute(delete(Media).where(Media.event_id == event_id))
 
