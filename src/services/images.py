@@ -8,7 +8,7 @@ def resize_image_width(image_bytes: bytes, target_width: int) -> bytes:
     Resizes an image to the target width while preserving the aspect ratio.
     Saves the resized image as WebP.
     """
-    img = Image.open(io.BytesIO(image_bytes))
+    img: Image.Image = Image.open(io.BytesIO(image_bytes))
 
     # Preserve orientation metadata if present (using PIL's ExifOps equivalent or transpose)
     try:
@@ -43,7 +43,7 @@ def generate_phash(image_bytes: bytes) -> str:
     Generates a 64-bit DCT perceptual hash from loaded image bytes.
     Returns the hash as a 64-character binary bitstring (consisting of '0' and '1').
     """
-    img = Image.open(io.BytesIO(image_bytes))
+    img: Image.Image = Image.open(io.BytesIO(image_bytes))
     try:
         from PIL import ImageOps
 

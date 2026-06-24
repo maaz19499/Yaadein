@@ -1,6 +1,6 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, Response
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
@@ -37,7 +37,7 @@ async def download_media(
     media_id: uuid.UUID,
     identity: UploadIdentity = Depends(get_upload_identity),
     db: AsyncSession = Depends(get_db),
-):
+) -> Response:
     # 1. Authorize identity (if guest, verify event matches header)
     if identity.guest_session_id:
         if identity.event_id != event_id:
@@ -67,7 +67,10 @@ async def download_media(
         )
 
     # 4. Check limits based on plan
-    limits = settings.PLAN_LIMITS.get(event.plan) or settings.PLAN_LIMITS.get("default")
+    plan_key = event.plan or "default"
+    limits: dict[str, int | None] = (
+        settings.PLAN_LIMITS.get(plan_key) or settings.PLAN_LIMITS["default"]
+    )
     max_count = limits.get("max_count")
     max_size_bytes = limits.get("max_size_bytes")
 
@@ -132,7 +135,7 @@ async def request_zip_export(
     payload: ExportRequest,
     identity: UploadIdentity = Depends(get_upload_identity),
     db: AsyncSession = Depends(get_db),
-):
+) -> ExportResponse:
     # 1. User must be authenticated (no guests allowed to trigger exports)
     if not identity.user_id:
         raise HTTPException(
@@ -189,7 +192,7 @@ async def get_export_status(
     export_id: uuid.UUID,
     identity: UploadIdentity = Depends(get_upload_identity),
     db: AsyncSession = Depends(get_db),
-):
+) -> ExportStatusResponse:
     # 1. User must be authenticated
     if not identity.user_id:
         raise HTTPException(
@@ -240,5 +243,7 @@ async def get_export_status(
             pass
 
     return ExportStatusResponse(
-        id=export_rec.id, status=export_rec.status, download_url=download_url
+        id=export_rec.id,
+        status=export_rec.status or "queued",
+        download_url=download_url,
     )

@@ -1,2 +1,7 @@
 .agents/
 *.env
+__pycache__/
+.ruff_cache/
+.venv/
+.pytest_cache/
+.mypy_cache/

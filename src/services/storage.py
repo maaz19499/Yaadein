@@ -1,4 +1,5 @@
 import math
+from typing import Any, cast
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
@@ -6,7 +7,7 @@ from src.config import settings
 
 
 class R2StorageService:
-    def __init__(self):
+    def __init__(self) -> None:
         self.s3_client = boto3.client(
             "s3",
             endpoint_url=settings.R2_ENDPOINT_URL,
@@ -32,18 +33,21 @@ class R2StorageService:
         """
         Generates a presigned URL for a single put_object upload.
         """
-        return self.s3_client.generate_presigned_url(
-            ClientMethod="put_object",
-            Params={
-                "Bucket": self.bucket_name,
-                "Key": object_key,
-            },
-            ExpiresIn=expires_in,
+        return cast(
+            str,
+            self.s3_client.generate_presigned_url(
+                ClientMethod="put_object",
+                Params={
+                    "Bucket": self.bucket_name,
+                    "Key": object_key,
+                },
+                ExpiresIn=expires_in,
+            ),
         )
 
     def generate_presigned_multipart_upload_urls(
         self, object_key: str, file_size: int, expires_in: int = 3600
-    ) -> tuple[str, list[dict]]:
+    ) -> tuple[str, list[dict[str, Any]]]:
         """
         Initiates a multipart upload and generates presigned URLs for each 10MB chunk.
         """
@@ -79,7 +83,9 @@ class R2StorageService:
 
         return upload_id, part_urls
 
-    def complete_multipart_upload(self, object_key: str, upload_id: str) -> dict:
+    def complete_multipart_upload(
+        self, object_key: str, upload_id: str
+    ) -> dict[str, Any]:
         """
         Completes a multipart upload by listing all uploaded parts and sending the complete call.
         """
@@ -100,20 +106,26 @@ class R2StorageService:
         # S3 requires the parts list to be sorted by PartNumber
         parts.sort(key=lambda p: p["PartNumber"])
 
-        return self.s3_client.complete_multipart_upload(
-            Bucket=self.bucket_name,
-            Key=object_key,
-            UploadId=upload_id,
-            MultipartUpload={"Parts": parts},
+        return cast(
+            dict[str, Any],
+            self.s3_client.complete_multipart_upload(
+                Bucket=self.bucket_name,
+                Key=object_key,
+                UploadId=upload_id,
+                MultipartUpload={"Parts": parts},
+            ),
         )
 
-    def head_object(self, object_key: str) -> dict:
+    def head_object(self, object_key: str) -> dict[str, Any]:
         """
         Gets metadata (headers) for the object in S3/R2.
         """
-        return self.s3_client.head_object(
-            Bucket=self.bucket_name,
-            Key=object_key,
+        return cast(
+            dict[str, Any],
+            self.s3_client.head_object(
+                Bucket=self.bucket_name,
+                Key=object_key,
+            ),
         )
 
     def get_object_body(self, object_key: str) -> bytes:
@@ -124,7 +136,7 @@ class R2StorageService:
             Bucket=self.bucket_name,
             Key=object_key,
         )
-        return response["Body"].read()
+        return cast(bytes, response["Body"].read())
 
     def upload_bytes(self, data: bytes, object_key: str, content_type: str) -> None:
         """
@@ -143,11 +155,14 @@ class R2StorageService:
         """
         Generates a presigned URL for downloading an object.
         """
-        return self.s3_client.generate_presigned_url(
-            ClientMethod="get_object",
-            Params={
-                "Bucket": self.bucket_name,
-                "Key": object_key,
-            },
-            ExpiresIn=expires_in,
+        return cast(
+            str,
+            self.s3_client.generate_presigned_url(
+                ClientMethod="get_object",
+                Params={
+                    "Bucket": self.bucket_name,
+                    "Key": object_key,
+                },
+                ExpiresIn=expires_in,
+            ),
         )

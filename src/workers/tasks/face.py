@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from datetime import datetime, timezone, timedelta
 from sqlalchemy import select
+from typing import cast
 
 from src.database import async_session_maker
 from src.models.event import Event
@@ -108,12 +109,14 @@ async def cluster_faces_for_event(event_id: uuid.UUID) -> None:
 
         # Cluster embeddings using FaceEmbeddingService
         face_service = FaceEmbeddingService()
-        emb_vectors = [emb.embedding for emb in embeddings]
+        # Filter out None embeddings to be type-safe
+        valid_embeddings = [emb for emb in embeddings if emb.embedding is not None]
+        emb_vectors = [cast(list[float], emb.embedding) for emb in valid_embeddings]
         labels = face_service.cluster_embeddings(emb_vectors, eps=0.4, min_samples=1)
 
         # Group embeddings by DBSCAN cluster label
-        groups = {}
-        for emb, label in zip(embeddings, labels):
+        groups: dict[int, list[FaceEmbedding]] = {}
+        for emb, label in zip(valid_embeddings, labels):
             if label != -1:
                 groups.setdefault(label, []).append(emb)
 
