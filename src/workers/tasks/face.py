@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from datetime import datetime, timezone, timedelta
-from sqlalchemy import select
+from sqlalchemy import select, update
 from typing import cast
 
 from src.database import async_session_maker
@@ -170,11 +170,13 @@ async def cluster_faces_for_event(event_id: uuid.UUID) -> None:
 
 async def _async_cluster_faces_job() -> None:
     now = datetime.now(timezone.utc)
-    # Fetch all events whose storage has not expired yet (active events)
+    # Fetch all events whose upload period has expired and have not been clustered yet
     async with async_session_maker() as session:
         events_res = await session.execute(
             select(Event).where(
-                (Event.storage_expires_at.is_(None)) | (Event.storage_expires_at > now)
+                Event.face_search_enabled == True,
+                Event.face_clustered == False,
+                (Event.upload_expires_at.is_(None)) | (Event.upload_expires_at <= now),
             )
         )
         events = list(events_res.scalars().all())
@@ -183,6 +185,13 @@ async def _async_cluster_faces_job() -> None:
     for event_id in event_ids:
         try:
             await cluster_faces_for_event(event_id)
+            async with async_session_maker() as session:
+                await session.execute(
+                    update(Event)
+                    .where(Event.id == event_id)
+                    .values(face_clustered=True)
+                )
+                await session.commit()
         except Exception:
             # Prevent failures in one event from breaking the entire daily clustering job
             pass

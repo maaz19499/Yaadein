@@ -1,14 +1,37 @@
+-- Yaadein Database Schema
+-- Changes from original: (1) committed to Supabase Auth, dropped dead `auth_provider` column
+--                        (2) enabled RLS on tenant-scoped tables (policies written separately)
+
+-- ============================================================
+-- DROP existing objects (clean re-run in Supabase SQL editor)
+-- ============================================================
+DROP TABLE IF EXISTS album_media CASCADE;
+DROP TABLE IF EXISTS albums CASCADE;
+DROP TABLE IF EXISTS exports CASCADE;
+DROP TABLE IF EXISTS qr_codes CASCADE;
+DROP TABLE IF EXISTS gallery_cache CASCADE;
+DROP TABLE IF EXISTS face_embeddings CASCADE;
+DROP TABLE IF EXISTS face_clusters CASCADE;
+DROP TABLE IF EXISTS face_consents CASCADE;
+DROP TABLE IF EXISTS payments CASCADE;
+DROP TABLE IF EXISTS media CASCADE;
+DROP TABLE IF EXISTS guests CASCADE;
+DROP TABLE IF EXISTS events CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+DROP FUNCTION IF EXISTS public.handle_new_user();
+
 -- Enable the pgvector extension for face embeddings
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- 1. USERS: Profiles for registered people (hosts, photographers, admins).
--- Maps 1:1 with Supabase Auth users.
+-- Maps 1:1 with Supabase Auth users. Auth provider committed to Supabase Auth (Rule 5 decision)
+-- -- `auth_provider` column dropped since it's no longer an open question.
 CREATE TABLE users (
   id              uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   phone           text UNIQUE NOT NULL,
   name            text,
   role            text CHECK (role IN ('host', 'photographer', 'admin')),
-  auth_provider   text,
   created_at      timestamptz DEFAULT now()
 );
 
@@ -20,6 +43,8 @@ CREATE TABLE events (
   face_search_enabled  boolean DEFAULT false,
   plan                 text CHECK (plan IN ('basic', 'premium', 'professional')),
   storage_expires_at   timestamptz,
+  upload_expires_at    timestamptz,
+  face_clustered       boolean DEFAULT false,
   is_wedding           boolean DEFAULT false,
   created_at           timestamptz DEFAULT now()
 );
@@ -49,7 +74,7 @@ CREATE TABLE media (
   file_size_bytes    bigint,
   mime_type          text,
   checksum           text,
-  phash              bit(64), -- Added for perceptual duplicate detection
+  phash              bit(64), -- perceptual duplicate detection
   width              int,
   height             int,
   duration_seconds   int,
@@ -61,7 +86,7 @@ CREATE TABLE media (
   FOREIGN KEY (event_id, guest_session_id) REFERENCES guests(event_id, guest_session_id) ON DELETE SET NULL
 ) PARTITION BY HASH (event_id);
 
--- Create index on event_id + created_at to support fast gallery sorting and overage count checks
+-- Index on event_id + created_at to support fast gallery sorting and overage count checks
 CREATE INDEX ON media (event_id, created_at DESC);
 
 -- 5. PAYMENTS: Transaction and upgrade audit trail
@@ -193,3 +218,19 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- 15. RLS: Turn the gate on for tenant-scoped tables.
+-- Policies (host-owns-event, guest-scoped-to-event, etc.) are intentionally
+-- NOT included here -- write and review those as their own deliberate step.
+ALTER TABLE users           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE guests          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE media           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE face_consents   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE face_clusters   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE face_embeddings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE gallery_cache   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE qr_codes        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE exports         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE albums          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE album_media     ENABLE ROW LEVEL SECURITY;

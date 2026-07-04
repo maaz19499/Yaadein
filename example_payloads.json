@@ -1,0 +1,425 @@
+{
+  "endpoints": [
+    {
+      "path": "/health",
+      "method": "GET",
+      "description": "API health check status",
+      "request": {
+        "headers": {},
+        "query_params": {},
+        "path_params": {},
+        "body": null
+      },
+      "response": {
+        "status_code": 200,
+        "body": {
+          "status": "healthy"
+        }
+      }
+    },
+    {
+      "path": "/api/v1/events",
+      "method": "POST",
+      "description": "Create a new event (Hosts, Photographers, Admins only)",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer <YOUR_JWT_TOKEN>",
+          "Content-Type": "application/json"
+        },
+        "query_params": {},
+        "path_params": {},
+        "body": {
+          "slug": "wedding-johndoe-2026",
+          "face_search_enabled": true,
+          "is_wedding": true
+        }
+      },
+      "response": {
+        "status_code": 201,
+        "body": {
+          "id": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+          "host_id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+          "slug": "wedding-johndoe-2026",
+          "plan": "basic",
+          "face_search_enabled": true,
+          "storage_expires_at": "2026-08-03T16:48:59Z",
+          "upload_expires_at": "2026-07-07T16:48:59Z",
+          "face_clustered": false,
+          "is_wedding": true,
+          "created_at": "2026-07-04T16:48:59Z"
+        }
+      }
+    },
+    {
+      "path": "/api/v1/events",
+      "method": "GET",
+      "description": "List all events for the current user. If host_id is supplied, it filters by it (restricted to admins unless host_id matches current user's ID).",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer <YOUR_JWT_TOKEN>"
+        },
+        "query_params": {
+          "host_id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d"
+        },
+        "path_params": {},
+        "body": null
+      },
+      "response": {
+        "status_code": 200,
+        "body": [
+          {
+            "id": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+            "host_id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+            "slug": "wedding-johndoe-2026",
+            "plan": "basic",
+            "face_search_enabled": true,
+            "storage_expires_at": "2026-08-03T16:48:59Z",
+            "upload_expires_at": "2026-07-07T16:48:59Z",
+            "face_clustered": false,
+            "is_wedding": true,
+            "created_at": "2026-07-04T16:48:59Z"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/api/v1/events/slug/{slug}",
+      "method": "GET",
+      "description": "Fetch minimal public event details by slug.",
+      "request": {
+        "headers": {},
+        "query_params": {},
+        "path_params": {
+          "slug": "wedding-johndoe-2026"
+        },
+        "body": null
+      },
+      "response": {
+        "status_code": 200,
+        "body": {
+          "id": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+          "slug": "wedding-johndoe-2026",
+          "face_search_enabled": true,
+          "is_wedding": true,
+          "plan": "basic"
+        }
+      }
+    },
+    {
+      "path": "/api/v1/events/{id}",
+      "method": "PUT",
+      "description": "Update event details by ID (Host/Admin only)",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer <YOUR_JWT_TOKEN>",
+          "Content-Type": "application/json"
+        },
+        "query_params": {},
+        "path_params": {
+          "id": "e3b0c442-98fc-11ee-b9d1-0242ac120002"
+        },
+        "body": {
+          "slug": "wedding-johndoe-2026-updated",
+          "face_search_enabled": false,
+          "is_wedding": false
+        }
+      },
+      "response": {
+        "status_code": 200,
+        "body": {
+          "id": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+          "host_id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+          "slug": "wedding-johndoe-2026-updated",
+          "plan": "basic",
+          "face_search_enabled": false,
+          "storage_expires_at": "2026-08-03T16:48:59Z",
+          "upload_expires_at": "2026-07-07T16:48:59Z",
+          "face_clustered": false,
+          "is_wedding": false,
+          "created_at": "2026-07-04T16:48:59Z"
+        }
+      }
+    },
+    {
+      "path": "/api/v1/events/{event_id}/guests",
+      "method": "POST",
+      "description": "Register guest session details and record DPDP face-search consent.",
+      "request": {
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "query_params": {},
+        "path_params": {
+          "event_id": "e3b0c442-98fc-11ee-b9d1-0242ac120002"
+        },
+        "body": {
+          "guest_session_id": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+          "name": "Jane Doe",
+          "phone": "+919876543210",
+          "face_search_consent": true
+        }
+      },
+      "response": {
+        "status_code": 200,
+        "body": {
+          "status": "success",
+          "guest": {
+            "guest_session_id": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+            "name": "Jane Doe",
+            "face_search_consent": true
+          }
+        }
+      }
+    },
+    {
+      "path": "/api/v1/uploads/presign",
+      "method": "POST",
+      "description": "Generate single-part or multipart presigned upload URLs for Cloudflare R2 storage.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer <YOUR_JWT_TOKEN>",
+          "X-Guest-Session-ID": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+          "X-Event-ID": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+          "Content-Type": "application/json"
+        },
+        "query_params": {},
+        "path_params": {},
+        "body": {
+          "event_id": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+          "files": [
+            {
+              "client_file_id": "file-12345",
+              "file_name": "wedding_photo.jpg",
+              "file_size_bytes": 1048576,
+              "mime_type": "image/jpeg",
+              "checksum": null
+            }
+          ]
+        }
+      },
+      "response": {
+        "status_code": 200,
+        "body": {
+          "files": [
+            {
+              "client_file_id": "file-12345",
+              "r2_upload_id": null,
+              "r2_object_key": "events/e3b0c442-98fc-11ee-b9d1-0242ac120002/originals/file-12345.jpg",
+              "idempotency_key": "idem-827ccb0eea8a706c4c34a16891f84e7b",
+              "chunk_size_bytes": null,
+              "chunks": [
+                {
+                  "part_number": 1,
+                  "url": "https://r2-endpoint-url.com/events/e3b0c442-98fc-11ee-b9d1-0242ac120002/originals/file-12345.jpg?signature=..."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "path": "/api/v1/media/confirm",
+      "method": "POST",
+      "description": "Confirm successful file upload to R2 and trigger image/video processing.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer <YOUR_JWT_TOKEN>",
+          "X-Guest-Session-ID": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+          "X-Event-ID": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+          "Content-Type": "application/json"
+        },
+        "query_params": {},
+        "path_params": {},
+        "body": {
+          "event_id": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+          "idempotency_key": "idem-827ccb0eea8a706c4c34a16891f84e7b",
+          "r2_object_key": "events/e3b0c442-98fc-11ee-b9d1-0242ac120002/originals/file-12345.jpg",
+          "r2_upload_id": null
+        }
+      },
+      "response": {
+        "status_code": 202,
+        "body": {
+          "status": "pending_verify",
+          "message": "File registration initialized and processing task queued."
+        }
+      }
+    },
+    {
+      "path": "/api/v1/events/{event_id}/albums",
+      "method": "POST",
+      "description": "Create a new static or dynamic album inside an event.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer <YOUR_JWT_TOKEN>",
+          "Content-Type": "application/json"
+        },
+        "query_params": {},
+        "path_params": {
+          "event_id": "e3b0c442-98fc-11ee-b9d1-0242ac120002"
+        },
+        "body": {
+          "name": "Bride & Groom Portraits",
+          "type": "static",
+          "media_ids": [
+            "c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f"
+          ],
+          "dynamic_filters": null
+        }
+      },
+      "response": {
+        "status_code": 201,
+        "body": {
+          "id": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a",
+          "event_id": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+          "name": "Bride & Groom Portraits",
+          "type": "static",
+          "dynamic_filters": null,
+          "created_at": "2026-07-04T16:48:59Z"
+        }
+      }
+    },
+    {
+      "path": "/api/v1/events/{event_id}/albums",
+      "method": "GET",
+      "description": "List all albums in the specified event.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer <YOUR_JWT_TOKEN>",
+          "X-Guest-Session-ID": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+          "X-Event-ID": "e3b0c442-98fc-11ee-b9d1-0242ac120002"
+        },
+        "query_params": {},
+        "path_params": {
+          "event_id": "e3b0c442-98fc-11ee-b9d1-0242ac120002"
+        },
+        "body": null
+      },
+      "response": {
+        "status_code": 200,
+        "body": [
+          {
+            "id": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a",
+            "event_id": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+            "name": "Bride & Groom Portraits",
+            "type": "static",
+            "dynamic_filters": null,
+            "created_at": "2026-07-04T16:48:59Z"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/api/v1/events/{event_id}/albums/{album_id}",
+      "method": "GET",
+      "description": "Fetch all media items inside a static or dynamic album.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer <YOUR_JWT_TOKEN>",
+          "X-Guest-Session-ID": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+          "X-Event-ID": "e3b0c442-98fc-11ee-b9d1-0242ac120002"
+        },
+        "query_params": {},
+        "path_params": {
+          "event_id": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+          "album_id": "d4e5f6a7-b8c9-0d1e-2f3a-4b5c6d7e8f9a"
+        },
+        "body": null
+      },
+      "response": {
+        "status_code": 200,
+        "body": [
+          {
+            "id": "c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f",
+            "event_id": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+            "uploaded_by": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+            "guest_session_id": null,
+            "type": "image",
+            "r2_object_key": "events/e3b0c442-98fc-11ee-b9d1-0242ac120002/originals/file-12345.jpg",
+            "status": "visible",
+            "file_size_bytes": 1048576,
+            "mime_type": "image/jpeg",
+            "width": 1920,
+            "height": 1080,
+            "thumbnail_url": "https://r2-endpoint-url.com/events/e3b0c442-98fc-11ee-b9d1-0242ac120002/thumbnails/file-12345.jpg",
+            "created_at": "2026-07-04T16:48:59Z"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/api/v1/media/{event_id}/{media_id}/download",
+      "method": "GET",
+      "description": "Download single high-resolution media file (redirects to a temporary presigned R2 download URL). Enforces plan-based storage and download limit counts.",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer <YOUR_JWT_TOKEN>",
+          "X-Guest-Session-ID": "b2c3d4e5-f6a7-8b9c-0d1e-2f3a4b5c6d7e",
+          "X-Event-ID": "e3b0c442-98fc-11ee-b9d1-0242ac120002"
+        },
+        "query_params": {},
+        "path_params": {
+          "event_id": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+          "media_id": "c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f"
+        },
+        "body": null
+      },
+      "response": {
+        "status_code": 307,
+        "description": "Redirects to the presigned R2 file URL",
+        "body": null
+      }
+    },
+    {
+      "path": "/api/v1/events/{event_id}/exports",
+      "method": "POST",
+      "description": "Request background ZIP generation for a full event or specific album (Host/Admin only).",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer <YOUR_JWT_TOKEN>",
+          "Content-Type": "application/json"
+        },
+        "query_params": {},
+        "path_params": {
+          "event_id": "e3b0c442-98fc-11ee-b9d1-0242ac120002"
+        },
+        "body": {
+          "scope": "full_event",
+          "album_id": null
+        }
+      },
+      "response": {
+        "status_code": 202,
+        "body": {
+          "export_id": "f5a6b7c8-d9e0-1f2a-3b4c-5d6e7f8a9b0c",
+          "status": "queued"
+        }
+      }
+    },
+    {
+      "path": "/api/v1/events/{event_id}/exports/{export_id}",
+      "method": "GET",
+      "description": "Fetch export zip progress status and get the presigned download link when ready (Host/Admin only).",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer <YOUR_JWT_TOKEN>"
+        },
+        "query_params": {},
+        "path_params": {
+          "event_id": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+          "export_id": "f5a6b7c8-d9e0-1f2a-3b4c-5d6e7f8a9b0c"
+        },
+        "body": null
+      },
+      "response": {
+        "status_code": 200,
+        "body": {
+          "id": "f5a6b7c8-d9e0-1f2a-3b4c-5d6e7f8a9b0c",
+          "status": "ready",
+          "download_url": "https://r2-endpoint-url.com/events/e3b0c442-98fc-11ee-b9d1-0242ac120002/exports/f5a6b7c8-d9e0-1f2a-3b4c-5d6e7f8a9b0c.zip?signature=..."
+        }
+      }
+    }
+  ]
+}

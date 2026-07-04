@@ -22,6 +22,12 @@ class Event(Base):
     storage_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    upload_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    face_clustered: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
     is_wedding: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

@@ -22,6 +22,8 @@ class EventResponse(BaseModel):
     plan: str | None
     face_search_enabled: bool
     storage_expires_at: datetime | None
+    upload_expires_at: datetime | None
+    face_clustered: bool
     is_wedding: bool
     created_at: datetime
 

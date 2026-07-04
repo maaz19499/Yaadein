@@ -235,7 +235,7 @@
 
   <div class="flow-note">
     <strong>Core guest flow (no login)</strong>
-    Guest scans QR → app generates a <code>guest_session_id</code> client-side → first time that session is seen, a row is created in <code>guests</code> → if face search is enabled, guest sees a consent checkbox + optional name (writes to <code>face_consents</code>) → guest uploads media (<code>media.guest_session_id</code> set, no <code>users</code> row created) → after <code>events.storage_expires_at</code>, a batch job clusters faces into <code>face_clusters</code>.
+    Guest scans QR → app generates a <code>guest_session_id</code> client-side → first time that session is seen, a row is created in <code>guests</code> → if face search is enabled, guest sees a consent checkbox + optional name (writes to <code>face_consents</code>) → guest uploads media (<code>media.guest_session_id</code> set, no <code>users</code> row created) → after <code>events.upload_expires_at</code>, a batch job clusters faces into <code>face_clusters</code>.
   </div>
 
   <nav class="toc">
@@ -299,6 +299,8 @@
   face_search_enabled  boolean DEFAULT false,
   plan                 text CHECK (plan IN ('basic','premium','professional')),
   storage_expires_at   timestamptz,
+  upload_expires_at    timestamptz,
+  face_clustered       boolean DEFAULT false,
   is_wedding           boolean DEFAULT false,
   created_at           timestamptz DEFAULT now()
 );</pre>
@@ -306,8 +308,8 @@
     <div class="panel">
       <div class="panel-title">Example data</div>
       <table class="data-table">
-        <tr><th>id <span class="tag tag-pk">PK</span></th><th>host_id <span class="tag tag-fk">FK</span></th><th>slug</th><th>face_search_enabled</th><th>plan</th><th>storage_expires_at</th></tr>
-        <tr><td>e1</td><td>u1</td><td>priya-rahul-wedding</td><td>true</td><td>premium</td><td>2027-06-22</td></tr>
+        <tr><th>id <span class="tag tag-pk">PK</span></th><th>host_id <span class="tag tag-fk">FK</span></th><th>slug</th><th>face_search_enabled</th><th>plan</th><th>storage_expires_at</th><th>upload_expires_at</th><th>face_clustered</th></tr>
+        <tr><td>e1</td><td>u1</td><td>priya-rahul-wedding</td><td>true</td><td>premium</td><td>2027-06-22</td><td>2026-06-25</td><td>false</td></tr>
       </table>
     </div>
   </section>

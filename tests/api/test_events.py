@@ -182,6 +182,54 @@ async def test_list_events(client: TestClient, db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
+async def test_list_events_filtering_and_permissions(client: TestClient, db_session: AsyncSession):
+    # Setup users
+    host1_id, headers1 = await create_test_user(db_session, "Host Priya", "host")
+    host2_id, headers2 = await create_test_user(db_session, "Host Rohan", "host")
+    admin_id, admin_headers = await create_test_user(db_session, "Admin Amit", "admin")
+
+    try:
+        # Create event for host1
+        slug1 = f"slug1-{uuid.uuid4().hex[:8]}"
+        response1 = client.post(
+            "/api/v1/events",
+            json={"slug": slug1, "is_wedding": True},
+            headers=headers1,
+        )
+        assert response1.status_code == status.HTTP_201_CREATED
+        event1_id = uuid.UUID(response1.json()["id"])
+
+        # 1. Query with own host_id (succeeds)
+        response = client.get(f"/api/v1/events?host_id={host1_id}", headers=headers1)
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert len(data) >= 1
+        assert any(e["id"] == str(event1_id) for e in data)
+
+        # 2. Query other host's events as non-admin (returns 403 Forbidden)
+        response_forbidden = client.get(f"/api/v1/events?host_id={host1_id}", headers=headers2)
+        assert response_forbidden.status_code == status.HTTP_403_FORBIDDEN
+        assert "Not authorized" in response_forbidden.json()["detail"]
+
+        # 3. Query other host's events as admin (succeeds)
+        response_admin = client.get(f"/api/v1/events?host_id={host1_id}", headers=admin_headers)
+        assert response_admin.status_code == status.HTTP_200_OK
+        data_admin = response_admin.json()
+        assert len(data_admin) >= 1
+        assert any(e["id"] == str(event1_id) for e in data_admin)
+
+        # Cleanup event
+        result = await db_session.execute(select(Event).where(Event.id == event1_id))
+        event = result.scalar_one()
+        await db_session.delete(event)
+        await db_session.commit()
+    finally:
+        await delete_test_user(db_session, host1_id)
+        await delete_test_user(db_session, host2_id)
+        await delete_test_user(db_session, admin_id)
+
+
+@pytest.mark.asyncio
 async def test_get_event_by_slug(client: TestClient, db_session: AsyncSession):
     host_id, headers = await create_test_user(db_session, "Host Priya", "host")
     slug = f"wedding-{uuid.uuid4().hex[:8]}"

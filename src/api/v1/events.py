@@ -42,6 +42,7 @@ async def create_event(
     now = datetime.now(timezone.utc)
     # Default plan to basic and storage expires in 30 days
     storage_expires = now + timedelta(days=30)
+    upload_expires = now + timedelta(days=3)
 
     event = Event(
         host_id=current_user.id,
@@ -49,6 +50,7 @@ async def create_event(
         face_search_enabled=event_in.face_search_enabled,
         plan="basic",
         storage_expires_at=storage_expires,
+        upload_expires_at=upload_expires,
         is_wedding=event_in.is_wedding,
         created_at=now,
     )
@@ -60,15 +62,25 @@ async def create_event(
 
 @router.get("", response_model=list[EventResponse])
 async def list_events(
+    host_id: uuid.UUID | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[Event]:
+    target_host_id = host_id if host_id is not None else current_user.id
+
+    if target_host_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view events for this host.",
+        )
+
     result = await db.execute(
         select(Event)
-        .where(Event.host_id == current_user.id)
+        .where(Event.host_id == target_host_id)
         .order_by(Event.created_at.desc())
     )
     return list(result.scalars().all())
+
 
 
 @router.get("/slug/{slug}", response_model=EventPublicResponse)

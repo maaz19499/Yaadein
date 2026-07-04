@@ -272,3 +272,152 @@ async def test_face_clustering_job(db_session: AsyncSession):
 
     finally:
         await delete_test_user(db_session, host_id)
+
+
+@pytest.mark.asyncio
+async def test_face_clustering_periodic_job_filters(db_session: AsyncSession):
+    from src.workers.tasks.face import _async_cluster_faces_job
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import delete
+
+    host_id, _ = await create_test_user(db_session, "Host Face Filter", "host")
+
+    try:
+        now = datetime.now(timezone.utc)
+
+        # 1. Expired Event (should be clustered)
+        event_expired = Event(
+            host_id=host_id,
+            slug=f"expired-{uuid.uuid4().hex[:8]}",
+            face_search_enabled=True,
+            face_clustered=False,
+            upload_expires_at=now - timedelta(days=1),
+            plan="basic",
+        )
+
+        # 2. Active Event (should NOT be clustered)
+        event_active = Event(
+            host_id=host_id,
+            slug=f"active-{uuid.uuid4().hex[:8]}",
+            face_search_enabled=True,
+            face_clustered=False,
+            upload_expires_at=now + timedelta(days=1),
+            plan="basic",
+        )
+
+        db_session.add_all([event_expired, event_active])
+        await db_session.commit()
+        await db_session.refresh(event_expired)
+        await db_session.refresh(event_active)
+
+        # Create guest, consent, media for expired event
+        guest_exp = Guest(event_id=event_expired.id, guest_session_id=uuid.uuid4(), name="Guest Exp")
+        db_session.add(guest_exp)
+        await db_session.flush()
+
+        consent_exp = FaceConsent(
+            event_id=event_expired.id,
+            guest_session_id=guest_exp.guest_session_id,
+            guest_name=guest_exp.name,
+            consent_given_at=event_expired.created_at,
+        )
+        db_session.add(consent_exp)
+        await db_session.flush()
+
+        media_exp = Media(
+            id=uuid.uuid4(),
+            event_id=event_expired.id,
+            guest_session_id=guest_exp.guest_session_id,
+            type="image",
+            r2_object_key=f"events/{event_expired.id}/originals/exp.jpg",
+            idempotency_key="idem-exp",
+            status="visible",
+            thumbnail_url="http://r2/exp-thumb.webp",
+        )
+        db_session.add(media_exp)
+        await db_session.flush()
+
+        # Create guest, consent, media for active event
+        guest_act = Guest(event_id=event_active.id, guest_session_id=uuid.uuid4(), name="Guest Act")
+        db_session.add(guest_act)
+        await db_session.flush()
+
+        consent_act = FaceConsent(
+            event_id=event_active.id,
+            guest_session_id=guest_act.guest_session_id,
+            guest_name=guest_act.name,
+            consent_given_at=event_active.created_at,
+        )
+        db_session.add(consent_act)
+        await db_session.flush()
+
+        media_act = Media(
+            id=uuid.uuid4(),
+            event_id=event_active.id,
+            guest_session_id=guest_act.guest_session_id,
+            type="image",
+            r2_object_key=f"events/{event_active.id}/originals/act.jpg",
+            idempotency_key="idem-act",
+            status="visible",
+            thumbnail_url="http://r2/act-thumb.webp",
+        )
+        db_session.add(media_act)
+        await db_session.flush()
+
+        # Seed embedding for expired event
+        emb_expired = FaceEmbedding(
+            event_id=event_expired.id,
+            media_id=media_exp.id,
+            embedding=[0.5] * 512,
+            uploader_consent_id=consent_exp.id,
+            purge_at=event_expired.created_at,
+        )
+
+        # Seed embedding for active event
+        emb_active = FaceEmbedding(
+            event_id=event_active.id,
+            media_id=media_act.id,
+            embedding=[0.5] * 512,
+            uploader_consent_id=consent_act.id,
+            purge_at=event_active.created_at,
+        )
+
+        db_session.add_all([emb_expired, emb_active])
+        await db_session.commit()
+
+        # Run periodic job
+        await _async_cluster_faces_job()
+
+        # Refresh database state
+        db_session.expire_all()
+        await db_session.refresh(event_expired)
+        await db_session.refresh(event_active)
+
+        # Assertions
+        assert event_expired.face_clustered is True
+        assert event_active.face_clustered is False
+
+        # Verify cluster created for expired event only
+        clusters_expired = (await db_session.execute(
+            select(FaceCluster).where(FaceCluster.event_id == event_expired.id)
+        )).scalars().all()
+        assert len(clusters_expired) == 1
+
+        clusters_active = (await db_session.execute(
+            select(FaceCluster).where(FaceCluster.event_id == event_active.id)
+        )).scalars().all()
+        assert len(clusters_active) == 0
+
+        # Clean up
+        await db_session.execute(delete(FaceEmbedding).where(FaceEmbedding.event_id.in_([event_expired.id, event_active.id])))
+        await db_session.execute(delete(FaceCluster).where(FaceCluster.event_id.in_([event_expired.id, event_active.id])))
+        await db_session.execute(delete(Media).where(Media.event_id.in_([event_expired.id, event_active.id])))
+        await db_session.execute(delete(FaceConsent).where(FaceConsent.event_id.in_([event_expired.id, event_active.id])))
+        await db_session.execute(delete(Guest).where(Guest.event_id.in_([event_expired.id, event_active.id])))
+        await db_session.delete(event_expired)
+        await db_session.delete(event_active)
+        await db_session.commit()
+
+    finally:
+        await delete_test_user(db_session, host_id)
+
