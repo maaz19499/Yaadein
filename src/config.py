@@ -94,12 +94,18 @@ class Settings(BaseSettings):
     @property
     def REDIS_URL(self) -> str:
         if self.is_production:
-            return (
+            url = (
                 self.UPSTASH_REDIS_URL
                 or self.EXPLICIT_REDIS_URL
                 or self.LOCAL_REDIS_URL
             )
-        return self.EXPLICIT_REDIS_URL or self.LOCAL_REDIS_URL
+        else:
+            url = self.EXPLICIT_REDIS_URL or self.LOCAL_REDIS_URL
+
+        if url.startswith("rediss://") and "ssl_cert_reqs" not in url:
+            separator = "&" if "?" in url else "?"
+            url = f"{url}{separator}ssl_cert_reqs=CERT_NONE"
+        return url
 
     @property
     def R2_ENDPOINT_URL(self) -> str:
