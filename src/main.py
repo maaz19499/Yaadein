@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware 
+# pyrefly: ignore [missing-import]
 from src.api.v1 import (
     events_router,
     auth_router,
@@ -12,6 +14,15 @@ app = FastAPI(
     title="Yaadein API",
     description="AI-powered event photo and video sharing platform backend API",
     version="0.1.0",
+)
+
+# Add CORS Middleware <-- Add this block
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Allows all origins; replace with specific domains for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(events_router, prefix="/api/v1/events")

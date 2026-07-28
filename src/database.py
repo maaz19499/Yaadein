@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+# pyrefly: ignore [missing-import]
 from src.config import settings
 
 # Format DATABASE_URL to use the async psycopg driver

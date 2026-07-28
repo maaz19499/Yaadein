@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yaadein — JWT & Signing Keys Guide</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --bg-surface: rgba(255, 255, 255, 0.03);
+      --bg-surface-hover: rgba(255, 255, 255, 0.05);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(255, 255, 255, 0.2);
+      
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-dark: #6b7280;
+      
+      --jwt-header: #ff6b6b;
+      --jwt-header-bg: rgba(255, 107, 107, 0.1);
+      --jwt-payload: #845ef7;
+      --jwt-payload-bg: rgba(132, 94, 247, 0.1);
+      --jwt-signature: #20c997;
+      --jwt-signature-bg: rgba(32, 201, 151, 0.1);
+      
+      --accent: #3b82f6;
+      --accent-glow: rgba(59, 130, 246, 0.15);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      
+      --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+      
+      --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(132, 94, 247, 0.08) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text);
+      line-height: 1.6;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 24px;
+    }
+
+    /* Header Styles */
+    header {
+      margin-bottom: 40px;
+      position: relative;
+    }
+
+    .brand-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      color: var(--accent);
+      backdrop-filter: blur(8px);
+    }
+
+    .brand-badge::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    h1 {
+      font-size: 42px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+      background: linear-gradient(135deg, #fff 30%, #a5b4fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      font-size: 18px;
+      color: var(--text-muted);
+      max-width: 780px;
+      font-weight: 300;
+    }
+
+    /* Tabs Navigation */
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 32px;
+      overflow-x: auto;
+      padding-bottom: 1px;
+      scrollbar-width: none;
+    }
+    .nav-tabs::-webkit-scrollbar {
+      display: none;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-family: var(--font-sans);
+      font-size: 16px;
+      font-weight: 500;
+      padding: 12px 20px;
+      cursor: pointer;
+      border-radius: 8px 8px 0 0;
+      transition: var(--transition);
+      white-space: nowrap;
+      position: relative;
+    }
+
+    .tab-btn:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .tab-btn.active {
+      color: var(--text);
+    }
+
+    .tab-btn.active::after {
+      content: "";
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+    }
+
+    /* Card Panels */
+    .tab-panel {
+      display: none;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+
+    @media (min-width: 900px) {
+      .grid-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+      .grid-3 {
+        grid-template-columns: 1fr 1fr 1fr;
+      }
+      .grid-7-5 {
+        grid-template-columns: 7fr 5fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .card-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-title svg {
+      width: 20px;
+      height: 20px;
+      color: var(--accent);
+    }
+
+    /* Paragraphs and Lists */
+    p {
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    ul, ol {
+      margin-left: 20px;
+      margin-bottom: 20px;
+      color: var(--text-muted);
+    }
+
+    li {
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+
+    strong {
+      color: var(--text);
+    }
+
+    /* Interactive Playground Components */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: var(--text-muted);
+    }
+
+    textarea, input, select {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      padding: 12px;
+      transition: var(--transition);
+    }
+
+    textarea {
+      resize: vertical;
+    }
+
+    select {
+      font-family: var(--font-sans);
+      cursor: pointer;
+    }
+
+    select option {
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    textarea:focus, input:focus, select:focus {
+      outline: none;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+    }
+
+    /* JWT Color coding output representation */
+    .jwt-token-display {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      font-family: var(--font-mono);
+      font-size: 15px;
+      word-break: break-all;
+      line-height: 1.8;
+      cursor: pointer;
+      position: relative;
+      user-select: text;
+    }
+
+    .token-part {
+      border-radius: 3px;
+      padding: 2px 4px;
+      transition: var(--transition);
+    }
+
+    .token-part.header {
+      color: var(--jwt-header);
+      background: var(--jwt-header-bg);
+      font-weight: 600;
+    }
+    .token-part.header:hover, .token-part.header.highlighted {
+      background: rgba(255, 107, 107, 0.25);
+    }
+
+    .token-part.payload {
+      color: var(--jwt-payload);
+      background: var(--jwt-payload-bg);
+      font-weight: 600;
+    }
+    .token-part.payload:hover, .token-part.payload.highlighted {
+      background: rgba(132, 94, 247, 0.25);
+    }
+
+    .token-part.signature {
+      color: var(--jwt-signature);
+      background: var(--jwt-signature-bg);
+      font-weight: 600;
+    }
+    .token-part.signature:hover, .token-part.signature.highlighted {
+      background: rgba(32, 201, 151, 0.25);
+    }
+
+    .dot {
+      color: var(--text-dark);
+      font-weight: bold;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-success {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .badge-error {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--danger);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .badge-warning {
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--warning);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+
+    /* Code Blocks */
+    pre {
+      background: rgba(0, 0, 0, 0.3) !important;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 13.5px;
+      margin-bottom: 20px;
+      color: #cbd5e1;
+    }
+
+    code {
+      font-family: var(--font-mono);
+    }
+
+    .inline-code {
+      background: rgba(255, 255, 255, 0.07);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--text);
+    }
+
+    /* Subsections */
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      margin-top: 24px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 6px;
+    }
+
+    /* Flow Simulator Styles */
+    .simulator-container {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+
+    @media (min-width: 768px) {
+      .simulator-container {
+        grid-template-columns: 280px 1fr;
+      }
+    }
+
+    .flow-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .flow-step-btn {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 8px;
+      padding: 12px 16px;
+      cursor: pointer;
+      text-align: left;
+      font-family: var(--font-sans);
+      font-size: 14px;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .flow-step-btn:hover {
+      background: var(--bg-surface-hover);
+      color: var(--text);
+    }
+
+    .flow-step-btn.active {
+      background: var(--accent-glow);
+      border-color: var(--accent);
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .flow-step-num {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      transition: var(--transition);
+    }
+
+    .flow-step-btn.active .flow-step-num {
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    .flow-canvas-card {
+      position: relative;
+      min-height: 420px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .canvas-viz {
+      flex-grow: 1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      padding: 40px 20px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      z-index: 2;
+    }
+
+    .node-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      transition: var(--transition);
+    }
+
+    .node.active .node-icon {
+      border-color: var(--accent);
+      background: var(--accent-glow);
+      color: var(--text);
+      box-shadow: 0 0 15px rgba(59, 130, 246, 0.1);
+    }
+
+    .node-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .node.active .node-label {
+      color: var(--text);
+    }
+
+    /* Path Animation Lines */
+    .flow-lines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .flow-line {
+      stroke: var(--border);
+      stroke-width: 2;
+      stroke-dasharray: 6,6;
+      transition: var(--transition);
+    }
+
+    .flow-line.active {
+      stroke: var(--accent);
+      stroke-width: 3;
+      stroke-dasharray: 6,4;
+      animation: dash 1.5s linear infinite;
+    }
+
+    @keyframes dash {
+      to {
+        stroke-dashoffset: -20;
+      }
+    }
+
+    .flow-description {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 14px;
+      border-left: 3px solid var(--accent);
+    }
+
+    .flow-description h4 {
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+
+    /* Toggle switches & custom styled buttons */
+    .btn-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: var(--transition);
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--border-focus);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .btn-primary:hover {
+      background: #2563eb;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Toggle Selector for Flow Sim & Playground config */
+    .toggle-selector {
+      display: inline-flex;
+      background: rgba(0,0,0,0.2);
+      border: 1px solid var(--border);
+      padding: 4px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .toggle-opt {
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: var(--transition);
+      border: none;
+      background: none;
+    }
+
+    .toggle-opt.active {
+      background: var(--bg-surface-hover);
+      color: var(--text);
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    /* Alerts */
+    .alert {
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .alert-info {
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.15);
+      color: #93c5fd;
+    }
+
+    .alert-warning {
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.15);
+      color: #fde047;
+    }
+
+    .alert-svg {
+      width: 20px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+
+    /* Code highlights */
+    .keyword { color: #f472b6; }
+    .string { color: #34d399; }
+    .comment { color: var(--text-dark); }
+    .def { color: #60a5fa; }
+    .call { color: #a78bfa; }
+    .decorator { color: #fbbf24; }
+
+    /* Custom CSS tooltips & highlights */
+    .interactive-jwt-wrapper {
+      position: relative;
+    }
+
+    /* Dot indicators in token parts key */
+    .color-key-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 12px;
+      font-size: 13px;
+    }
+    .color-key {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .color-key-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .color-key-dot.header { background: var(--jwt-header); }
+    .color-key-dot.payload { background: var(--jwt-payload); }
+    .color-key-dot.signature { background: var(--jwt-signature); }
+
+    /* Env Config block */
+    .env-variable-block {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      padding: 16px;
+      border: 1px solid var(--border);
+      position: relative;
+      margin-bottom: 16px;
+    }
+    
+    .copy-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+    }
+    .copy-btn:hover {
+      color: var(--text);
+      background: var(--bg-surface-hover);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div class="brand-badge">Yaadein Docs</div>
+      <h1>JWT & Signing Keys Guide</h1>
+      <p class="subtitle">An interactive manual detailing how JSON Web Tokens work, symmetric vs asymmetric keys, verification flows, and local setup using Supabase's modern JWT Signing Keys.</p>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <div class="nav-tabs">
+      <button class="tab-btn active" onclick="switchTab(event, 'what-is-jwt')">📖 1. JWT & Signing Keys</button>
+      <button class="tab-btn" onclick="switchTab(event, 'playground')">🛠️ 2. Interactive Playground</button>
+      <button class="tab-btn" onclick="switchTab(event, 'flow-sim')">🔄 3. Authentication Flow</button>
+      <button class="tab-btn" onclick="switchTab(event, 'setup-guide')">⚙️ 4. Yaadein Code & Setup</button>
+      <button class="tab-btn" onclick="switchTab(event, 'security-best')">🔒 5. Security & Rotation</button>
+    </div>
+
+    <!-- TAB 1: WHAT IS JWT / SIGNING KEYS -->
+    <div id="what-is-jwt" class="tab-panel active">
+      <div class="grid grid-7-5">
+        <div class="card">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            What is a JSON Web Token?
+          </div>
+          <p>
+            A <strong>JSON Web Token (JWT)</strong> is an open standard (<a href="https://tools.ietf.org/html/rfc7519" target="_blank" style="color:var(--accent);">RFC 7519</a>) that securely transmits user details as a signed JSON object.
+          </p>
+          <p>
+            Historically, backend applications verified JWTs by sharing a single <strong>Symmetric Secret Key</strong> (e.g. HS256) with the auth server. However, modern authentication servers like <strong>Supabase</strong> have migrated to <strong>Asymmetric Signing Keys</strong> (e.g. RS256/ES256).
+          </p>
+          
+          <div class="section-title">Symmetric (Legacy) vs. Asymmetric (Modern)</div>
+          <ul style="margin-bottom: 20px;">
+            <li>
+              <strong>Symmetric (HS256):</strong> A single secret key is shared between Supabase and your FastAPI backend. The same key is used to sign and to verify tokens. If the backend is compromised and the key is leaked, attackers can forge custom valid JWTs.
+            </li>
+            <li>
+              <strong>Asymmetric (RS256 / ES256):</strong> Supabase keeps a <strong>Private Key</strong> secret to sign tokens. It publishes a public key list called a <strong>JWKS (JSON Web Key Set)</strong> at a well-known endpoint: <span class="inline-code">https://&lt;project&gt;.supabase.co/auth/v1/.well-known/jwks.json</span>. Your FastAPI backend retrieves this public key dynamically to verify signatures. The backend can verify tokens but *never* has the capacity to sign/forge them.
+            </li>
+          </ul>
+
+          <div class="alert alert-info">
+            <svg class="alert-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <div>
+              <strong>Seamless Rotation:</strong> With asymmetric keys, Supabase can rotate keys without breaking your API backend. The backend dynamically fetches the new public keys from the JWKS endpoint, avoiding service disruption and manual environment variable updates.
+            </div>
+          </div>
+        </div>
+
+        <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div class="card-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M4 19.5A2.5 2.5 0 0 0 6.5 22H20M4 19.5V3.5A2.5 2.5 0 0 1 6.5 1H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5z"/></svg>
+              JWT Structure Visualized
+            </div>
+            <p>A typical JWT token looks like this:</p>
+            
+            <div class="jwt-token-display">
+              <span class="token-part header">eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6IjFhMmIifQ</span><span class="dot">.</span><span class="token-part payload">eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ</span><span class="dot">.</span><span class="token-part signature">SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c...</span>
+            </div>
+
+            <div class="color-key-list">
+              <span class="color-key"><span class="color-key-dot header"></span> Header (contains <span class="inline-code">kid</span> - Key ID)</span>
+              <span class="color-key"><span class="color-key-dot payload"></span> Payload (Claims & Exp)</span>
+              <span class="color-key"><span class="color-key-dot signature"></span> Signature (Asymmetric hash)</span>
+            </div>
+
+            <div class="section-title" style="margin-top:28px;">The Key ID claim (<span class="inline-code">kid</span>)</div>
+            <p style="font-size: 14px;">
+              The header of asymmetric tokens contains a <span class="inline-code">kid</span> claim. This tells the verifier which public key from the JWKS list was used to sign this specific token, so they can verify the signature.
+            </p>
+          </div>
+          <div style="margin-top: 20px;">
+            <button class="btn btn-primary" style="width: 100%; justify-content: center;" onclick="switchTab(null, 'playground')">
+              Try the JWT & JWKS Playground →
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: INTERACTIVE PLAYGROUND -->
+    <div id="playground" class="tab-panel">
+      <div class="toggle-selector">
+        <button id="btn-play-hs" class="toggle-opt active" onclick="switchPlaygroundAlg('HS256')">Symmetric (HS256)</button>
+        <button id="btn-play-rs" class="toggle-opt" onclick="switchPlaygroundAlg('RS256')">Asymmetric (RS256 & JWKS)</button>
+      </div>
+
+      <div class="grid grid-2">
+        <!-- Editor Column -->
+        <div class="card">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            JWT Editor & Signer
+          </div>
+          
+          <!-- Symmetric HS256 Input -->
+          <div class="form-group" id="group-hs-secret">
+            <label for="jwt-secret">HMAC Shared Secret</label>
+            <input type="text" id="jwt-secret" value="dummy_supabase_jwt_secret_for_local_development_must_be_changed" oninput="updateTokenFromJSON()">
+          </div>
+
+          <!-- Asymmetric RS256 Information -->
+          <div id="group-rs-info" style="display:none; margin-bottom: 20px;">
+            <div class="alert alert-info" style="margin-bottom: 12px; padding: 12px;">
+              <div>
+                <strong>Asymmetric Key:</strong> A mock 2048-bit RSA keypair is generated in your browser. The private key signs the token, and the public key verifies it.
+              </div>
+            </div>
+            <label>Auto-Generated Public Key (JWK Representation)</label>
+            <textarea id="jwk-public-display" rows="4" readonly style="font-size:12px; background: rgba(0,0,0,0.45);"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="jwt-header-input" style="color: var(--jwt-header);">Header (JSON)</label>
+            <textarea id="jwt-header-input" rows="4" oninput="updateTokenFromJSON()">{
+  "alg": "HS256",
+  "typ": "JWT"
+}</textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="jwt-payload-input" style="color: var(--jwt-payload);">Payload (JSON / Claims)</label>
+            <textarea id="jwt-payload-input" rows="8" oninput="updateTokenFromJSON()">{
+  "sub": "2f42be6a-d34e-4f51-86ab-dcd63e790a88",
+  "email": "user@example.com",
+  "role": "authenticated",
+  "iss": "https://supabase.co",
+  "iat": 1783060000,
+  "exp": 1783063600
+}</textarea>
+          </div>
+        </div>
+
+        <!-- Output Column -->
+        <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+          <div>
+            <div class="card-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect><line x1="7" y1="2" x2="7" y2="22"></line><line x1="17" y1="2" x2="17" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+              Generated JWT (Encoded)
+            </div>
+            
+            <div class="interactive-jwt-wrapper">
+              <div id="jwt-encoded-output" class="jwt-token-display" style="min-height: 120px;">
+                <span class="token-part header"></span><span class="dot">.</span><span class="token-part payload"></span><span class="dot">.</span><span class="token-part signature"></span>
+              </div>
+              <div class="btn-group" style="margin-top: 10px;">
+                <button class="btn" onclick="copyTokenToClipboard()">📋 Copy Token</button>
+              </div>
+            </div>
+
+            <!-- Simulated JWKS tab if RS256 is selected -->
+            <div id="jwks-simulated-box" style="display:none; margin-top:20px;">
+              <div class="section-title">Simulated JWKS Endpoint Response (keys.json)</div>
+              <pre style="font-size:11px; max-height:150px; overflow-y:auto;" id="jwks-json-response"></pre>
+            </div>
+
+            <div class="section-title" style="margin-top: 32px;">Real-Time Decoder (Paste here)</div>
+            <p style="font-size: 13px;">Paste a JWT below to decode and verify against selected algorithm parameters:</p>
+            <textarea id="jwt-paste-input" rows="3" placeholder="Paste your token here..." oninput="decodePastedToken()" style="font-size: 13px;"></textarea>
+
+            <div style="margin-top: 16px; display: flex; align-items: center; gap: 12px;">
+              <span>Signature Status:</span>
+              <span id="sig-status-badge" class="badge badge-success">Valid</span>
+            </div>
+          </div>
+
+          <div style="margin-top: 24px; font-size: 13px; color: var(--text-dark);">
+            <p>💡 Tip: Switch algorithms at the top to compare HMAC validation (shared secret) vs RSA verification (public keys).</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: AUTHENTICATION FLOW -->
+    <div id="flow-sim" class="tab-panel">
+      <div class="toggle-selector">
+        <button id="btn-flow-hs" class="toggle-opt active" onclick="switchFlowType('HS256')">Legacy Symmetric (HS256)</button>
+        <button id="btn-flow-rs" class="toggle-opt" onclick="switchFlowType('RS256')">Modern Asymmetric (JWKS / RS256)</button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+          <span id="flow-title-text">Interactive Symmetric Flow</span>
+        </div>
+        <p id="flow-intro-text">Flow simulation depicting authentication using a shared HMAC key secret.</p>
+        
+        <div class="simulator-container">
+          <!-- Step Selector -->
+          <div class="flow-steps" id="flow-steps-container">
+            <!-- Populated dynamically via JS -->
+          </div>
+
+          <!-- Flow Canvas -->
+          <div class="card flow-canvas-card" style="background: rgba(0, 0, 0, 0.2);">
+            <div class="canvas-viz">
+              <!-- Node 1: Client -->
+              <div class="node active" id="node-client">
+                <div class="node-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                </div>
+                <div class="node-label">Client App</div>
+              </div>
+
+              <!-- Node 2: Supabase -->
+              <div class="node" id="node-auth">
+                <div class="node-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                </div>
+                <div class="node-label">Supabase Auth</div>
+              </div>
+
+              <!-- Node 3: API Backend -->
+              <div class="node" id="node-backend">
+                <div class="node-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+                </div>
+                <div class="node-label">FastAPI Backend</div>
+              </div>
+
+              <!-- Flow SVG Overlay Lines -->
+              <svg class="flow-lines">
+                <path id="line-client-auth" d="M 120 120 L 320 120" class="flow-line" style="display:none;"></path>
+                <path id="line-auth-client" d="M 320 120 L 120 120" class="flow-line" style="display:none;"></path>
+                <path id="line-client-backend" d="M 120 120 L 530 120" class="flow-line" style="display:none;"></path>
+                <path id="line-backend-client" d="M 530 120 L 120 120" class="flow-line" style="display:none;"></path>
+                <!-- Line from Backend to Auth (retrieve JWKS) -->
+                <path id="line-backend-auth" d="M 530 120 L 320 120" class="flow-line" style="display:none;"></path>
+              </svg>
+            </div>
+
+            <div class="flow-description" id="flow-desc">
+              <h4>1. Login Request</h4>
+              <p style="margin-bottom:0;">The client app sends credentials to Supabase Auth over HTTPS.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: SETUP GUIDE -->
+    <div id="setup-guide" class="tab-panel">
+      <div class="card">
+        <div class="card-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+          Setting up JWT signing validation in FastAPI
+        </div>
+        
+        <p>Since Supabase uses asymmetric signing keys by default for modern projects, you can verify tokens locally using **JWKS** (automatically querying and caching Supabase public keys). Let's review both configurations.</p>
+        
+        <div class="toggle-selector">
+          <button id="btn-code-rs" class="toggle-opt active" onclick="switchCodeTab('RS256')">Modern JWKS Validation (Recommended)</button>
+          <button id="btn-code-hs" class="toggle-opt" onclick="switchCodeTab('HS256')">Legacy Secret validation (HS256)</button>
+        </div>
+
+        <!-- Modern Asymmetric Setup Code -->
+        <div id="code-panel-rs">
+          <div class="section-title">Step 1: Configure .env Variables</div>
+          <p>Add your Supabase JWKS endpoint URL in your <span class="inline-code">.env</span> file. This endpoint publishes your project's active public keys:</p>
+          <div class="env-variable-block">
+            <button class="copy-btn" onclick="copyText('env-code-rs', this)">Copy</button>
+            <pre id="env-code-rs"># .env
+SUPABASE_JWKS_URL="https://your-project-ref.supabase.co/auth/v1/.well-known/jwks.json"</pre>
+          </div>
+
+          <div class="section-title">Step 2: Update FastAPI Dependencies</div>
+          <p>Update <span class="inline-code">src/api/deps.py</span> to retrieve keys dynamically using PyJWT's built-in <span class="inline-code">PyJWKClient</span>. This verifies token authenticity without needing any local secret key:</p>
+          
+          <pre><span class="keyword">import</span> jwt
+<span class="keyword">from</span> jwt <span class="keyword">import</span> PyJWKClient
+<span class="keyword">from</span> fastapi <span class="keyword">import</span> Depends, HTTPException, status
+<span class="keyword">from</span> fastapi.security <span class="keyword">import</span> HTTPBearer, HTTPAuthorizationCredentials
+<span class="keyword">from</span> src.config <span class="keyword">import</span> settings
+
+security = <span class="call">HTTPBearer</span>()
+
+<span class="comment"># Initialize JWK Client with cache enabled</span>
+jwks_client = <span class="call">PyJWKClient</span>(settings.SUPABASE_JWKS_URL)
+
+<span class="keyword">async def</span> <span class="def">get_current_user</span>(
+    credentials: HTTPAuthorizationCredentials = <span class="call">Depends</span>(security),
+) -> User:
+    token = credentials.credentials
+    <span class="keyword">try</span>:
+        <span class="comment"># Get the verification key dynamically using the 'kid' claim in token header</span>
+        signing_key = jwks_client.<span class="call">get_signing_key_from_jwt</span>(token)
+        
+        <span class="comment"># Verify signature locally against public key</span>
+        payload = jwt.<span class="call">decode</span>(
+            token,
+            signing_key.key,
+            algorithms=[<span class="string">"RS256"</span>],
+            options={<span class="string">"verify_aud"</span>: <span class="keyword">False</span>},
+        )
+    <span class="keyword">except</span> jwt.PyJWTError <span class="keyword">as</span> e:
+        <span class="keyword">raise</span> <span class="call">HTTPException</span>(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=<span class="string">f"Could not validate credentials: {str(e)}"</span>,
+            headers={<span class="string">"WWW-Authenticate"</span>: <span class="string">"Bearer"</span>},
+        )
+
+    user_id = payload.<span class="call">get</span>(<span class="string">"sub"</span>)
+    ...
+</pre>
+        </div>
+
+        <!-- Legacy Symmetric Setup Code -->
+        <div id="code-panel-hs" style="display:none;">
+          <div class="section-title">Step 1: Configure Environment Variables</div>
+          <p>Keep your Supabase legacy JWT Secret key in the <span class="inline-code">.env</span> file:</p>
+          <div class="env-variable-block">
+            <button class="copy-btn" onclick="copyText('env-code-hs', this)">Copy</button>
+            <pre id="env-code-hs"># .env
+SUPABASE_JWT_SECRET="your_legacy_symmetric_secret_key_string"</pre>
+          </div>
+
+          <div class="section-title">Step 2: Verification dependency (HS256)</div>
+          <p>FastAPI decodes tokens using local HMAC-SHA256 signature checks:</p>
+          <pre><span class="keyword">import</span> jwt
+<span class="keyword">from</span> src.config <span class="keyword">import</span> settings
+
+<span class="keyword">async def</span> <span class="def">get_current_user</span>(
+    credentials: HTTPAuthorizationCredentials = <span class="call">Depends</span>(security),
+) -> User:
+    token = credentials.credentials
+    <span class="keyword">try</span>:
+        payload = jwt.<span class="call">decode</span>(
+            token,
+            settings.SUPABASE_JWT_SECRET,
+            algorithms=[<span class="string">"HS256"</span>],
+            options={<span class="string">"verify_aud"</span>: <span class="keyword">False</span>},
+        )
+    <span class="keyword">except</span> jwt.PyJWTError <span class="keyword">as</span> e:
+        <span class="keyword">raise</span> <span class="call">HTTPException</span>(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=<span class="string">f"Invalid signature or secret: {str(e)}"</span>,
+        )
+    user_id = payload.<span class="call">get</span>(<span class="string">"sub"</span>)
+    ...
+</pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 5: SECURITY & ROTATION -->
+    <div id="security-best" class="tab-panel">
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            Key Rotation Best Practices
+          </div>
+          <p>
+            When utilizing **Asymmetric Keys (JWKS)**, you gain the ability to rotate credentials gracefully. Supabase handles rotation by introducing a new signing key alongside older keys during transition phases.
+          </p>
+          
+          <div class="section-title">1. Cache TTL & Refresh</div>
+          <p>
+            PyJWT's <span class="inline-code">PyJWKClient</span> caches retrieved keys to avoid calling Supabase on every single API request. However, it will refresh the JWK list automatically if it encounters an unknown Key ID (<span class="inline-code">kid</span>) to check if a key rotation has just occurred.
+          </p>
+
+          <div class="section-title">2. Invalidation Window</div>
+          <p>
+            After rotating keys in the Supabase Dashboard under **Project Settings → JWT**, wait for existing client sessions to expire (or keep the secondary key active for a temporary window) before officially **revoking** the previous keys to avoid terminating logged-in users.
+          </p>
+
+          <div class="alert alert-info" style="margin-top: 16px;">
+            <div>
+              <strong>Secure Backend:</strong> If your API backend environment variables are leaked, attackers **cannot** compromise your user base since they do not possess the private key required to forge valid session tokens.
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><polyline points="12 6 12 12 16 14"></polyline></svg>
+            Validation Configuration
+          </div>
+          <p>
+            FastAPI token verification should validate basic assertions to avoid exploitation:
+          </p>
+
+          <div class="section-title">1. Algorithm Restriction</div>
+          <p>
+            Always restrict accepted decoding algorithms explicitly:
+            <pre>algorithms=["RS256"]</pre>
+            Failing to do so allows attackers to change the header to `HS256` and sign the token using the public key as a symmetric key (known as the *Algorithm Confusion Attack*).
+          </p>
+
+          <div class="section-title">2. Expired Claim checks</div>
+          <p>
+            Ensure your decoder enforces <span class="inline-code">exp</span> validation. PyJWT handles this automatically, throwing a <span class="inline-code">ExpiredSignatureError</span> if the token lifetime is exceeded.
+          </p>
+
+          <div class="section-title">3. Audience Bypass for Supabase</div>
+          <p>
+            Supabase uses customizable user claims and metadata in the audience (<span class="inline-code">aud</span>) payload field (often setting it to <span class="inline-code">authenticated</span>). To bypass default PyJWT checks looking for specific client audience IDs, configure:
+            <pre>options={"verify_aud": False}</pre>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Client-side Script -->
+  <script>
+    let activeAlg = 'HS256';
+    let rsaKeyPair = null;
+    let cachedJwkPublic = null;
+    
+    // Tab switching logic
+    function switchTab(event, tabId) {
+      document.querySelectorAll('.tab-panel').forEach(panel => {
+        panel.classList.remove('active');
+      });
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+      });
+      
+      document.getElementById(tabId).classList.add('active');
+      if (event) {
+        event.target.classList.add('active');
+      } else {
+        const targetBtn = Array.from(document.querySelectorAll('.tab-btn')).find(btn => 
+          btn.getAttribute('onclick').includes(tabId)
+        );
+        if (targetBtn) targetBtn.classList.add('active');
+      }
+
+      if (tabId === 'flow-sim') {
+        setTimeout(() => triggerFlowStep(1), 100);
+      }
+    }
+
+    // Toggle logic for Playground algs
+    async function switchPlaygroundAlg(alg) {
+      activeAlg = alg;
+      
+      document.getElementById('btn-play-hs').classList.toggle('active', alg === 'HS256');
+      document.getElementById('btn-play-rs').classList.toggle('active', alg === 'RS256');
+      
+      document.getElementById('group-hs-secret').style.display = alg === 'HS256' ? 'block' : 'none';
+      document.getElementById('group-rs-info').style.display = alg === 'RS256' ? 'block' : 'none';
+      document.getElementById('jwks-simulated-box').style.display = alg === 'RS256' ? 'block' : 'none';
+
+      // Update header template based on selected algorithm
+      const headerBox = document.getElementById('jwt-header-input');
+      const headerJSON = JSON.parse(headerBox.value);
+      headerJSON.alg = alg;
+      if (alg === 'RS256') {
+        headerJSON.kid = "key-supabase-v1";
+        // Initialize RSA keys
+        await initializeRsaKeys();
+      } else {
+        delete headerJSON.kid;
+      }
+      headerBox.value = JSON.stringify(headerJSON, null, 2);
+
+      updateTokenFromJSON();
+    }
+
+    // Setup code panel tabs
+    function switchCodeTab(alg) {
+      document.getElementById('btn-code-rs').classList.toggle('active', alg === 'RS256');
+      document.getElementById('btn-code-hs').classList.toggle('active', alg === 'HS256');
+      
+      document.getElementById('code-panel-rs').style.display = alg === 'RS256' ? 'block' : 'none';
+      document.getElementById('code-panel-hs').style.display = alg === 'HS256' ? 'block' : 'none';
+    }
+
+    // Initialize RSA keys using Web Crypto API
+    async function initializeRsaKeys() {
+      if (rsaKeyPair) return;
+      try {
+        rsaKeyPair = await window.crypto.subtle.generateKey(
+          {
+            name: "RSASSA-PKCS1-v1_5",
+            modulusLength: 2048,
+            publicExponent: new Uint8Array([1, 0, 1]),
+            hash: { name: "SHA-256" },
+          },
+          true,
+          ["sign", "verify"]
+        );
+        
+        cachedJwkPublic = await window.crypto.subtle.exportKey("jwk", rsaKeyPair.publicKey);
+        cachedJwkPublic.kid = "key-supabase-v1";
+        cachedJwkPublic.alg = "RS256";
+        cachedJwkPublic.use = "sig";
+        
+        document.getElementById('jwk-public-display').value = JSON.stringify(cachedJwkPublic, null, 2);
+        
+        // Populate JWKS simulated response
+        const jwks = {
+          keys: [ cachedJwkPublic ]
+        };
+        document.getElementById('jwks-json-response').textContent = JSON.stringify(jwks, null, 2);
+      } catch (e) {
+        console.error("RSA Keygen failed: ", e);
+      }
+    }
+
+    // Helper functions for Base64 Url encoding and decoding
+    function base64UrlEncode(str) {
+      try {
+        const base64 = btoa(unescape(encodeURIComponent(str)));
+        return base64.replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+      } catch (e) {
+        return "";
+      }
+    }
+
+    function base64UrlDecode(str) {
+      try {
+        let base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+        while (base64.length % 4) {
+          base64 += "=";
+        }
+        const raw = atob(base64);
+        const uint8 = new Uint8Array(raw.length);
+        for (let i = 0; i < raw.length; i++) {
+          uint8[i] = raw.charCodeAt(i);
+        }
+        return new TextDecoder().decode(uint8);
+      } catch (e) {
+        return "";
+      }
+    }
+
+    // Crypto sign helper
+    async function signData(headerStr, payloadStr, secretOrKey) {
+      const encoder = new TextEncoder();
+      const headerB64 = base64UrlEncode(headerStr);
+      const payloadB64 = base64UrlEncode(payloadStr);
+      const message = `${headerB64}.${payloadB64}`;
+      const messageData = encoder.encode(message);
+      
+      if (activeAlg === 'HS256') {
+        const secretData = encoder.encode(secretOrKey);
+        try {
+          const key = await window.crypto.subtle.importKey(
+            "raw",
+            secretData,
+            { name: "HMAC", hash: { name: "SHA-256" } },
+            false,
+            ["sign"]
+          );
+          const sigBuffer = await window.crypto.subtle.sign("HMAC", key, messageData);
+          const sigArray = new Uint8Array(sigBuffer);
+          let binary = '';
+          for (let i = 0; i < sigArray.byteLength; i++) {
+            binary += String.fromCharCode(sigArray[i]);
+          }
+          return {
+            headerB64,
+            payloadB64,
+            signatureB64: btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_")
+          };
+        } catch (err) {
+          return { headerB64, payloadB64, signatureB64: base64UrlEncode(message + secretOrKey) };
+        }
+      } else {
+        // RS256 signing using private key
+        if (!rsaKeyPair) await initializeRsaKeys();
+        try {
+          const sigBuffer = await window.crypto.subtle.sign(
+            "RSASSA-PKCS1-v1_5",
+            rsaKeyPair.privateKey,
+            messageData
+          );
+          const sigArray = new Uint8Array(sigBuffer);
+          let binary = '';
+          for (let i = 0; i < sigArray.byteLength; i++) {
+            binary += String.fromCharCode(sigArray[i]);
+          }
+          return {
+            headerB64,
+            payloadB64,
+            signatureB64: btoa(binary).replace(/=/g, "").replace(/\+/g, "-").replace(/\//g, "_")
+          };
+        } catch (err) {
+          return { headerB64, payloadB64, signatureB64: "dummy_rsa_signature_error_occurred" };
+        }
+      }
+    }
+
+    // Update Encodings from JSON boxes
+    async function updateTokenFromJSON() {
+      const headerText = document.getElementById('jwt-header-input').value;
+      const payloadText = document.getElementById('jwt-payload-input').value;
+      const secretText = document.getElementById('jwt-secret').value;
+
+      try {
+        JSON.parse(headerText);
+        JSON.parse(payloadText);
+      } catch (e) {
+        return;
+      }
+
+      const res = await signData(headerText, payloadText, secretText);
+      
+      const displayDiv = document.getElementById('jwt-encoded-output');
+      displayDiv.querySelector('.header').textContent = res.headerB64;
+      displayDiv.querySelector('.payload').textContent = res.payloadB64;
+      displayDiv.querySelector('.signature').textContent = res.signatureB64.substring(0, 40) + "...";
+      displayDiv.querySelector('.signature').setAttribute('data-full-sig', res.signatureB64);
+
+      document.getElementById('jwt-paste-input').value = `${res.headerB64}.${res.payloadB64}.${res.signatureB64}`;
+      
+      const badge = document.getElementById('sig-status-badge');
+      badge.textContent = "Valid (Generated)";
+      badge.className = "badge badge-success";
+    }
+
+    // Decode pasted token and verify
+    async function decodePastedToken() {
+      const token = document.getElementById('jwt-paste-input').value.trim();
+      const secret = document.getElementById('jwt-secret').value;
+      const parts = token.split('.');
+
+      const badge = document.getElementById('sig-status-badge');
+
+      if (parts.length !== 3) {
+        badge.textContent = "Format Error";
+        badge.className = "badge badge-error";
+        return;
+      }
+
+      const headerJSON = base64UrlDecode(parts[0]);
+      const payloadJSON = base64UrlDecode(parts[1]);
+
+      if (headerJSON && payloadJSON) {
+        try {
+          const parsedHeader = JSON.parse(headerJSON);
+          document.getElementById('jwt-header-input').value = JSON.stringify(parsedHeader, null, 2);
+          document.getElementById('jwt-payload-input').value = JSON.stringify(JSON.parse(payloadJSON), null, 2);
+          
+          if (parsedHeader.alg && parsedHeader.alg !== activeAlg) {
+            await switchPlaygroundAlg(parsedHeader.alg);
+          }
+        } catch (e) {
+          document.getElementById('jwt-header-input').value = headerJSON;
+          document.getElementById('jwt-payload-input').value = payloadJSON;
+        }
+
+        const displayDiv = document.getElementById('jwt-encoded-output');
+        displayDiv.querySelector('.header').textContent = parts[0];
+        displayDiv.querySelector('.payload').textContent = parts[1];
+        displayDiv.querySelector('.signature').textContent = parts[2].substring(0, 40) + "...";
+        displayDiv.querySelector('.signature').setAttribute('data-full-sig', parts[2]);
+
+        // Validate signature
+        if (activeAlg === 'HS256') {
+          const localSignResult = await signData(headerJSON, payloadJSON, secret);
+          if (localSignResult.signatureB64 === parts[2]) {
+            badge.textContent = "Valid HS256 Signature";
+            badge.className = "badge badge-success";
+          } else {
+            badge.textContent = "Invalid Signature";
+            badge.className = "badge badge-error";
+          }
+        } else {
+          // Asymmetric verification inside browser using Web Crypto API
+          if (!rsaKeyPair) await initializeRsaKeys();
+          try {
+            const encoder = new TextEncoder();
+            const messageData = encoder.encode(`${parts[0]}.${parts[1]}`);
+            
+            // Reconstruct signature Uint8Array from base64url
+            const sigB64 = parts[2].replace(/-/g, "+").replace(/_/g, "/");
+            const sigBinary = atob(sigB64);
+            const sigBytes = new Uint8Array(sigBinary.length);
+            for (let i = 0; i < sigBinary.length; i++) {
+              sigBytes[i] = sigBinary.charCodeAt(i);
+            }
+            
+            const isValid = await window.crypto.subtle.verify(
+              "RSASSA-PKCS1-v1_5",
+              rsaKeyPair.publicKey,
+              sigBytes,
+              messageData
+            );
+            
+            if (isValid) {
+              badge.textContent = "Valid RS256 (JWK) Signature";
+              badge.className = "badge badge-success";
+            } else {
+              badge.textContent = "Invalid Signature (Mismatch Key)";
+              badge.className = "badge badge-error";
+            }
+          } catch (e) {
+            badge.textContent = "Verification Error";
+            badge.className = "badge badge-warning";
+          }
+        }
+      }
+    }
+
+    function copyTokenToClipboard() {
+      const displayDiv = document.getElementById('jwt-encoded-output');
+      const parts = displayDiv.querySelectorAll('.token-part');
+      const sig = parts[2].getAttribute('data-full-sig') || parts[2].textContent;
+      const text = `${parts[0].textContent}.${parts[1].textContent}.${sig}`;
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Token copied to clipboard!");
+      });
+    }
+
+    function copyText(elemId, btn) {
+      const text = document.getElementById(elemId).innerText.replace("# .env\n", "");
+      navigator.clipboard.writeText(text).then(() => {
+        const oldText = btn.innerText;
+        btn.innerText = "Copied!";
+        setTimeout(() => btn.innerText = oldText, 2000);
+      });
+    }
+
+    // Step-by-step interactive flow simulation
+    let currentFlowType = 'HS256';
+    const stepsHS = [
+      { num: 1, title: "Login Request", desc: "Client app forwards username/password to Supabase Auth over HTTPS." },
+      { num: 2, title: "Symmetric Sign JWT", desc: "Supabase verifies credentials, signs payload claims with **Symmetric Secret** (HS256), and sends JWT to client." },
+      { num: 3, title: "Store JWT", desc: "Browser client stores token in HttpOnly cookies or memory for future requests." },
+      { num: 4, title: "Bearer Auth Call", desc: "Client sends API requests attaching header: 'Authorization: Bearer <JWT>'." },
+      { num: 5, title: "Verify with Secret", desc: "FastAPI Backend decodes token locally using its copy of the shared **SUPABASE_JWT_SECRET**." },
+      { num: 6, title: "Serve Resource", desc: "API validates expiration and user claims, returning secure details to the browser." }
+    ];
+
+    const stepsRS = [
+      { num: 1, title: "Login Request", desc: "Client app forwards credentials to Supabase Auth over HTTPS." },
+      { num: 2, title: "Asymmetric Sign JWT", desc: "Supabase signs payload with its private key (RS256). Token gets a key ID ('kid') in header." },
+      { num: 3, title: "Store JWT", desc: "Browser client keeps token in secure memory/cookies." },
+      { num: 4, title: "Bearer Auth Call", desc: "Client requests backend endpoint with standard Bearer JWT header." },
+      { num: 5, title: "Fetch JWKS Public Keys", desc: "FastAPI backend calls Supabase's `/.well-known/jwks.json` to get list of valid public keys and caches them." },
+      { num: 6, title: "Local RSA Verify", desc: "Backend matches token 'kid' to downloaded public key, confirms signature locally, and validates claim payload." },
+      { num: 7, title: "Serve Resource", desc: "Backend safely accesses database resources and replies to browser client." }
+    ];
+
+    function switchFlowType(type) {
+      currentFlowType = type;
+      document.getElementById('btn-flow-hs').classList.toggle('active', type === 'HS256');
+      document.getElementById('btn-flow-rs').classList.toggle('active', type === 'RS256');
+      
+      document.getElementById('flow-title-text').textContent = type === 'HS256' ? "Interactive Symmetric Flow (HS256)" : "Interactive Asymmetric Flow (JWKS / RS256)";
+      document.getElementById('flow-intro-text').textContent = type === 'HS256' 
+        ? "Flow simulation depicting authentication using a shared HMAC key secret."
+        : "Flow simulation depicting verification using dynamically cached JWKS public keys.";
+
+      renderFlowSteps();
+      triggerFlowStep(1);
+    }
+
+    function renderFlowSteps() {
+      const container = document.getElementById('flow-steps-container');
+      container.innerHTML = '';
+      const steps = currentFlowType === 'HS256' ? stepsHS : stepsRS;
+      
+      steps.forEach((stepObj, idx) => {
+        const btn = document.createElement('button');
+        btn.className = `flow-step-btn ${idx === 0 ? 'active' : ''}`;
+        btn.onclick = () => triggerFlowStep(stepObj.num);
+        btn.innerHTML = `<span class="flow-step-num">${stepObj.num}</span> ${stepObj.title}`;
+        container.appendChild(btn);
+      });
+    }
+
+    function triggerFlowStep(step) {
+      const buttons = document.querySelectorAll('.flow-step-btn');
+      buttons.forEach((btn, idx) => {
+        btn.classList.toggle('active', idx === (step - 1));
+      });
+
+      document.querySelectorAll('.node').forEach(node => node.classList.remove('active'));
+      document.querySelectorAll('.flow-line').forEach(line => {
+        line.classList.remove('active');
+        line.style.display = 'none';
+      });
+
+      const nodeClient = document.getElementById('node-client');
+      const nodeAuth = document.getElementById('node-auth');
+      const nodeBackend = document.getElementById('node-backend');
+
+      const descHeader = document.querySelector('#flow-desc h4');
+      const descPara = document.querySelector('#flow-desc p');
+      
+      const steps = currentFlowType === 'HS256' ? stepsHS : stepsRS;
+      const currentStepObj = steps[step - 1];
+
+      descHeader.textContent = `${currentStepObj.num}. ${currentStepObj.title}`;
+      descPara.textContent = currentStepObj.desc;
+
+      if (currentFlowType === 'HS256') {
+        switch (step) {
+          case 1:
+            nodeClient.classList.add('active');
+            nodeAuth.classList.add('active');
+            toggleLine('line-client-auth', true);
+            break;
+          case 2:
+            nodeAuth.classList.add('active');
+            nodeClient.classList.add('active');
+            toggleLine('line-auth-client', true);
+            break;
+          case 3:
+            nodeClient.classList.add('active');
+            break;
+          case 4:
+            nodeClient.classList.add('active');
+            nodeBackend.classList.add('active');
+            toggleLine('line-client-backend', true);
+            break;
+          case 5:
+            nodeBackend.classList.add('active');
+            break;
+          case 6:
+            nodeBackend.classList.add('active');
+            nodeClient.classList.add('active');
+            toggleLine('line-backend-client', true);
+            break;
+        }
+      } else {
+        // RS256 Asymmetric Steps
+        switch (step) {
+          case 1:
+            nodeClient.classList.add('active');
+            nodeAuth.classList.add('active');
+            toggleLine('line-client-auth', true);
+            break;
+          case 2:
+            nodeAuth.classList.add('active');
+            nodeClient.classList.add('active');
+            toggleLine('line-auth-client', true);
+            break;
+          case 3:
+            nodeClient.classList.add('active');
+            break;
+          case 4:
+            nodeClient.classList.add('active');
+            nodeBackend.classList.add('active');
+            toggleLine('line-client-backend', true);
+            break;
+          case 5:
+            nodeBackend.classList.add('active');
+            nodeAuth.classList.add('active');
+            toggleLine('line-backend-auth', true);
+            break;
+          case 6:
+            nodeBackend.classList.add('active');
+            break;
+          case 7:
+            nodeBackend.classList.add('active');
+            nodeClient.classList.add('active');
+            toggleLine('line-backend-client', true);
+            break;
+        }
+      }
+    }
+
+    function toggleLine(lineId, active) {
+      const line = document.getElementById(lineId);
+      if (line) {
+        line.style.display = 'block';
+        line.classList.toggle('active', active);
+      }
+    }
+
+    window.onload = function() {
+      switchFlowType('RS256');
+      updateTokenFromJSON();
+    };
+  </script>
+</body>
+</html>

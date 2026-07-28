@@ -1,5 +1,7 @@
 import uuid
+from typing import Any
 import jwt
+from jwt import PyJWKClient
 from fastapi import Depends, HTTPException, status, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy import select
@@ -10,6 +12,34 @@ from src.models.user import User
 from src.models.guest import Guest
 
 security = HTTPBearer()
+
+# Initialize JWK Client if JWKS URL is provided
+jwks_client = (
+    PyJWKClient(settings.SUPABASE_JWKS_URL)
+    if settings.SUPABASE_JWKS_URL
+    else None
+)
+
+
+def decode_supabase_token(token: str) -> dict[str, Any]:
+    unverified_header = jwt.get_unverified_header(token)
+    alg = unverified_header.get("alg", "HS256")
+
+    if alg == "RS256" and jwks_client:
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+        return jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            options={"verify_aud": False},
+        )
+    else:
+        return jwt.decode(
+            token,
+            settings.SUPABASE_JWT_SECRET,
+            algorithms=["HS256"],
+            options={"verify_aud": False},
+        )
 
 
 class UploadIdentity:
@@ -31,14 +61,7 @@ async def get_current_user(
     token = credentials.credentials
     try:
         # Decode the Supabase JWT locally
-        payload = jwt.decode(
-            token,
-            settings.SUPABASE_JWT_SECRET,
-            algorithms=["HS256"],
-            options={
-                "verify_aud": False
-            },  # Supabase uses custom audience claims (e.g. 'authenticated')
-        )
+        payload = decode_supabase_token(token)
     except jwt.PyJWTError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -78,12 +101,7 @@ async def get_upload_identity(
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split(" ")[1]
         try:
-            payload = jwt.decode(
-                token,
-                settings.SUPABASE_JWT_SECRET,
-                algorithms=["HS256"],
-                options={"verify_aud": False},
-            )
+            payload = decode_supabase_token(token)
             user_id = payload.get("sub")
             if not user_id:
                 raise HTTPException(

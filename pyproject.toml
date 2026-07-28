@@ -63,3 +63,8 @@ line-length = 88
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 
+[tool.pyrefly]
+disable-search-path-heuristics = true
+search-path = ["."]
+
+
