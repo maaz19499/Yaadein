@@ -8,3 +8,6 @@ __pycache__/
 .agent/
 graphify-out/
 .gemini/
+appspec.yml
+scripts/
+deploy.yml
