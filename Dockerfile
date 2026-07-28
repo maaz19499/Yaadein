@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 RUN pip install poetry==2.4.1
 
-COPY pyproject.toml poetry.lock README.md $WORKDIR/
+COPY pyproject.toml README.md $WORKDIR/
 
 RUN poetry config virtualenvs.create false \
     && poetry install --only main --no-interaction --no-ansi
@@ -30,9 +30,12 @@ COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY src $WORKDIR/src
+COPY alembic.ini $WORKDIR/alembic.ini
+COPY scripts/entrypoint.sh $WORKDIR/entrypoint.sh
+RUN chmod +x $WORKDIR/entrypoint.sh
 
 EXPOSE 8000
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["/app/entrypoint.sh"]
 
 # Production Worker Stage
 FROM base AS worker
@@ -42,5 +45,6 @@ COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY src $WORKDIR/src
+COPY alembic.ini $WORKDIR/alembic.ini
 
 CMD ["celery", "-A", "src.workers.app.celery_app", "worker", "--loglevel=info"]
