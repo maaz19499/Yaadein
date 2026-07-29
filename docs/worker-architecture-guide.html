@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastAPI & Celery Worker Architecture Guide | Yaadein</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0b0f19;
+            --bg-secondary: #111827;
+            --bg-card: rgba(17, 24, 39, 0.7);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-highlight: rgba(56, 189, 248, 0.3);
+            
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --text-muted: #6b7280;
+            
+            --accent-blue: #38bdf8;
+            --accent-purple: #c084fc;
+            --accent-green: #4ade80;
+            --accent-amber: #fbbf24;
+            --accent-red: #f87171;
+            
+            --glow-blue: rgba(56, 189, 248, 0.15);
+            --glow-purple: rgba(192, 132, 252, 0.15);
+            --glow-green: rgba(74, 222, 128, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* Container Layout */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem 5rem 1.5rem;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            padding: 3rem 1rem 2rem 1rem;
+            position: relative;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.12) 0%, rgba(192, 132, 252, 0.05) 50%, transparent 70%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.35rem 0.85rem;
+            border-radius: 9999px;
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            color: var(--accent-blue);
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        h1 {
+            font-size: 2.75rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 50%, #38bdf8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+        }
+
+        .subtitle {
+            font-size: 1.15rem;
+            color: var(--text-secondary);
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Interactive Simulator Section */
+        .simulator-section {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2rem;
+            margin: 2.5rem 0;
+            backdrop-filter: blur(16px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .sim-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1.25rem;
+        }
+
+        .sim-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .mode-toggle {
+            display: flex;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 4px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .mode-btn {
+            padding: 0.6rem 1.25rem;
+            border-radius: 8px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .mode-btn.active {
+            background: var(--accent-blue);
+            color: #000;
+            font-weight: 700;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+        }
+
+        /* Architecture Diagram Canvas */
+        .arch-diagram {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1.5rem;
+            position: relative;
+            margin: 2rem 0;
+        }
+
+        @media (max-width: 900px) {
+            .arch-diagram {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Server Box Containers */
+        .server-boundary {
+            border: 2px dashed rgba(56, 189, 248, 0.3);
+            background: rgba(56, 189, 248, 0.02);
+            border-radius: 16px;
+            padding: 1.25rem;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .server-boundary.decoupled {
+            border-color: rgba(192, 132, 252, 0.4);
+            background: rgba(192, 132, 252, 0.02);
+        }
+
+        .server-label {
+            position: absolute;
+            top: -12px;
+            left: 20px;
+            background: var(--bg-primary);
+            padding: 2px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--accent-blue);
+            border: 1px solid var(--border-highlight);
+        }
+
+        .server-boundary.decoupled .server-label {
+            color: var(--accent-purple);
+            border-color: rgba(192, 132, 252, 0.4);
+        }
+
+        /* Component Node Box */
+        .node-card {
+            background: rgba(17, 24, 39, 0.9);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            padding: 1.25rem;
+            text-align: center;
+            position: relative;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .node-card.active-step {
+            border-color: var(--accent-green);
+            box-shadow: 0 0 20px rgba(74, 222, 128, 0.3);
+            transform: translateY(-4px);
+        }
+
+        .node-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .node-title {
+            font-weight: 700;
+            font-size: 1rem;
+            color: #fff;
+        }
+
+        .node-sub {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        /* Flow Simulation Controls & Logs */
+        .sim-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin-top: 2rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .sim-btn {
+            background: linear-gradient(135deg, var(--accent-blue), #0284c7);
+            color: #000;
+            font-weight: 700;
+            padding: 0.75rem 1.75rem;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .sim-btn:hover {
+            transform: scale(1.03);
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.5);
+        }
+
+        .sim-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .step-display {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+            color: var(--accent-green);
+        }
+
+        /* Section Cards */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin: 2.5rem 0;
+        }
+
+        @media (max-width: 800px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.75rem;
+            backdrop-filter: blur(12px);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.25rem;
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .blue-icon { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); }
+        .purple-icon { background: rgba(192, 132, 252, 0.15); color: var(--accent-purple); }
+        .amber-icon { background: rgba(251, 191, 36, 0.15); color: var(--accent-amber); }
+        .green-icon { background: rgba(74, 222, 128, 0.15); color: var(--accent-green); }
+
+        .card h2 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        /* Timeline / Flow List */
+        .timeline {
+            list-style: none;
+            position: relative;
+            padding-left: 1.5rem;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 5px;
+            top: 5px;
+            bottom: 5px;
+            width: 2px;
+            background: var(--border-color);
+        }
+
+        .timeline-item {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -1.5rem;
+            top: 6px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-blue);
+            box-shadow: 0 0 10px var(--accent-blue);
+        }
+
+        .timeline-title {
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 0.25rem;
+        }
+
+        .timeline-desc {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        /* Code Snippet Box */
+        pre {
+            background: #090d16;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            overflow-x: auto;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: #e2e8f0;
+            margin: 1rem 0;
+        }
+
+        code .keyword { color: #f472b6; }
+        code .function { color: #60a5fa; }
+        code .string { color: #34d399; }
+        code .comment { color: #6b7280; font-style: italic; }
+
+        /* Comparison Table */
+        .comp-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .comp-table th, .comp-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .comp-table th {
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--accent-blue);
+            font-weight: 700;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        .comp-table td {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .tag-free {
+            background: rgba(74, 222, 128, 0.15);
+            color: var(--accent-green);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+
+        .tag-paid {
+            background: rgba(248, 113, 113, 0.15);
+            color: var(--accent-red);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 0.8rem;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding-top: 3rem;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="badge">Architecture & Execution Blueprint</div>
+        <h1>FastAPI & Celery Background Workers</h1>
+        <p class="subtitle">An interactive deep-dive into task dispatching, broker messaging, co-location vs. decoupled deployment models, and AWS Free Tier optimization.</p>
+    </header>
+
+    <!-- Interactive Architecture Simulator -->
+    <section class="simulator-section">
+        <div class="sim-header">
+            <div class="sim-title">⚡ Interactive Execution Simulator</div>
+            <div class="mode-toggle">
+                <button class="mode-btn active" id="btn-colocated" onclick="switchMode('colocated')">Single EC2 (Co-located)</button>
+                <button class="mode-btn" id="btn-decoupled" onclick="switchMode('decoupled')">Decoupled (Multi-EC2)</button>
+            </div>
+        </div>
+
+        <div id="arch-container">
+            <!-- Dynamic Diagram Injected Here via JS -->
+        </div>
+
+        <div class="sim-controls">
+            <button class="sim-btn" id="run-sim-btn" onclick="runSimulation()">
+                <span>▶ Trigger Background Photo Processing</span>
+            </button>
+            <div class="step-display" id="step-log">Status: Ready. Click button to simulate task execution flow.</div>
+        </div>
+    </section>
+
+    <!-- Deep Dive Section 1: How Background Workers Get Called -->
+    <section class="card" style="margin-bottom: 2.5rem;">
+        <div class="card-header">
+            <div class="card-icon blue-icon">⚙️</div>
+            <h2>1. How Background Workers Get Called (Execution Lifecycle)</h2>
+        </div>
+
+        <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+            Celery background tasks follow a <strong>Producer-Broker-Consumer</strong> pattern. FastAPI acts as the producer, Redis acts as the message broker, and the Celery process acts as the asynchronous consumer.
+        </p>
+
+        <div class="grid-2">
+            <div>
+                <ul class="timeline">
+                    <li class="timeline-item">
+                        <div class="timeline-title">1. User sends HTTP Request</div>
+                        <div class="timeline-desc">User posts a file (e.g. <code>POST /api/v1/photos/upload</code>). FastAPI receives the request in Uvicorn event loop.</div>
+                    </li>
+                    <li class="timeline-item">
+                        <div class="timeline-title">2. FastAPI enqueues task asynchronously</div>
+                        <div class="timeline-desc">FastAPI calls <code>process_photo.delay(photo_id)</code>. Celery serializes task metadata into a JSON payload.</div>
+                    </li>
+                    <li class="timeline-item">
+                        <div class="timeline-title">3. Redis receives message in Queue</div>
+                        <div class="timeline-desc">The task payload is pushed into Redis (Key: <code>celery</code> list). FastAPI instantly returns HTTP 202 to user (< 30ms).</div>
+                    </li>
+                    <li class="timeline-item">
+                        <div class="timeline-title">4. Celery Worker pops and executes task</div>
+                        <div class="timeline-desc">The Celery worker process (listening to Redis via <code>BRPOP</code>) pops the task payload and executes heavy image AI embedding computation in background.</div>
+                    </li>
+                </ul>
+            </div>
+
+            <div>
+                <div style="font-weight: 700; color: #fff; margin-bottom: 0.5rem;">Code Example in Yaadein:</div>
+                <pre><code><span class="comment"># 1. FastAPI Producer (src/api/routes.py)</span>
+<span class="keyword">@app</span>.<span class="function">post</span>(<span class="string">"/photos/upload"</span>)
+<span class="keyword">async def</span> <span class="function">upload_photo</span>(photo_id: <span class="string">str</span>):
+    <span class="comment"># Enqueue task without blocking HTTP response</span>
+    process_photo.<span class="function">delay</span>(photo_id)
+    <span class="keyword">return</span> {"status": "processing", "photo_id": photo_id}
+
+<span class="comment"># 2. Celery Consumer (src/workers/app.py)</span>
+<span class="keyword">@celery_app</span>.<span class="function">task</span>(name=<span class="string">"process_photo"</span>)
+<span class="keyword">def</span> <span class="function">process_photo</span>(photo_id: <span class="string">str</span>):
+    <span class="comment"># Heavy face detection & pgvector embeddings</span>
+    generate_embeddings(photo_id)</code></pre>
+            </div>
+        </div>
+    </section>
+
+    <!-- Deep Dive Section 2: Architectural Comparison -->
+    <section class="grid-2">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon amber-icon">🖥️</div>
+                <h2>Single Server (Co-located)</h2>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 1rem;">
+                FastAPI, Celery, Redis, and PostgreSQL run as individual processes/containers inside <strong>one EC2 instance</strong>.
+            </p>
+
+            <ul style="color: var(--text-secondary); font-size: 0.9rem; margin-left: 1.25rem; line-height: 1.8;">
+                <li><strong style="color: var(--accent-green);">100% Free:</strong> Uses ~720 hrs/month (Fits in 750h AWS Free Tier quota).</li>
+                <li><strong style="color: var(--accent-blue);">Low Latency:</strong> In-memory IPC / Docker internal bridge networking (0.1ms broker ping).</li>
+                <li><strong style="color: var(--accent-amber);">RAM Management:</strong> Requires <strong>2GB Swap Space</strong> to prevent Out-Of-Memory (OOM) crashes on 1GB RAM micro instances.</li>
+                <li><strong style="color: var(--accent-amber);">CPU Sharing:</strong> High worker CPU spikes can briefly slow web request handling if worker concurrency isn't capped.</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <div class="card-icon purple-icon">🌐</div>
+                <h2>Decoupled (Multi-Server)</h2>
+            </div>
+            <p style="color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 1rem;">
+                FastAPI runs on Server A, Celery Workers on Server B, Redis & PostgreSQL on managed cloud hosts/Server C.
+            </p>
+
+            <ul style="color: var(--text-secondary); font-size: 0.9rem; margin-left: 1.25rem; line-height: 1.8;">
+                <li><strong style="color: var(--accent-red);">Incurs AWS Costs:</strong> 2 EC2 instances = 1,440 hours/month (Exceeds Free Tier by 690 hours -> 💸 Billed!).</li>
+                <li><strong style="color: var(--accent-purple);">Independent Auto-scaling:</strong> Spin up 10 worker nodes dynamically when queue depth increases.</li>
+                <li><strong style="color: var(--accent-blue);">Zero CPU Contention:</strong> Web requests never slow down even during intensive video/AI encoding.</li>
+                <li><strong style="color: var(--accent-secondary);">Network Overhead:</strong> All broker messages traverse external TCP/IP network.</li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- Section 3: Feature Matrix & AWS Cost Breakdown -->
+    <section class="card" style="margin-top: 2.5rem;">
+        <div class="card-header">
+            <div class="card-icon green-icon">📊</div>
+            <h2>Architectural Comparison & AWS Cost Matrix</h2>
+        </div>
+
+        <table class="comp-table">
+            <thead>
+                <tr>
+                    <th>Dimension</th>
+                    <th>Single EC2 (Co-located)</th>
+                    <th>Decoupled (Multi-EC2)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>AWS Free Tier Status</strong></td>
+                    <td><span class="tag-free">100% FREE</span> (~720 hrs/mo)</td>
+                    <td><span class="tag-paid">INCURS CHARGES</span> (~1,440 hrs/mo)</td>
+                </tr>
+                <tr>
+                    <td><strong>Estimated AWS Cost</strong></td>
+                    <td>$0.00 / month</td>
+                    <td>$15 - $40+ / month</td>
+                </tr>
+                <tr>
+                    <td><strong>Celery Communication</strong></td>
+                    <td>Loopback TCP (<code>localhost:6379</code>)</td>
+                    <td>Cross-Instance VPC Network (<code>10.0.x.x:6379</code>)</td>
+                </tr>
+                <tr>
+                    <td><strong>Resource Isolation</strong></td>
+                    <td>Shared vCPU & RAM (Mitigated via 2GB Swap)</td>
+                    <td>Isolated CPU & RAM per tier</td>
+                </tr>
+                <tr>
+                    <td><strong>Recommended Celery Tuning</strong></td>
+                    <td><code>--concurrency=1</code> or <code>--pool=solo</code></td>
+                    <td><code>--concurrency=4</code> (based on instance vCPUs)</td>
+                </tr>
+                <tr>
+                    <td><strong>Target Usage Case</strong></td>
+                    <td>MVP, Initial Launch, Free Tier Testing</td>
+                    <td>High Traffic Production, Heavy AI Pipelines</td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <footer>
+        <p>Yaadein Technical Documentation &bull; AWS EC2 Deployment Blueprint &bull; 2026</p>
+    </footer>
+</div>
+
+<script>
+    let currentMode = 'colocated';
+    let isSimulating = false;
+
+    function renderDiagram(mode) {
+        const container = document.getElementById('arch-container');
+        
+        if (mode === 'colocated') {
+            container.innerHTML = `
+                <div style="border: 2px dashed var(--accent-blue); background: rgba(56, 189, 248, 0.03); border-radius: 16px; padding: 1.5rem; position: relative;">
+                    <div class="server-label">AWS EC2 Instance (t2.micro / t3.micro - 1GB RAM + 2GB Swap)</div>
+                    <div class="arch-diagram">
+                        <div class="node-card" id="node-client">
+                            <div class="node-icon">📱</div>
+                            <div class="node-title">Client App</div>
+                            <div class="node-sub">User Upload</div>
+                        </div>
+                        <div class="node-card" id="node-fastapi">
+                            <div class="node-icon">⚡</div>
+                            <div class="node-title">FastAPI Web</div>
+                            <div class="node-sub">Port 8000 (Uvicorn)</div>
+                        </div>
+                        <div class="node-card" id="node-redis">
+                            <div class="node-icon">📦</div>
+                            <div class="node-title">Redis Broker</div>
+                            <div class="node-sub">Port 6379 (In-Memory)</div>
+                        </div>
+                        <div class="node-card" id="node-worker">
+                            <div class="node-icon">🛠️</div>
+                            <div class="node-title">Celery Worker</div>
+                            <div class="node-sub">Background Process</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;">
+                    <div class="server-boundary decoupled">
+                        <div class="server-label">EC2 Node 1 (Web Tier)</div>
+                        <div style="display: flex; flex-direction: column; gap: 1rem; margin-top: 0.5rem;">
+                            <div class="node-card" id="node-client">
+                                <div class="node-icon">📱</div>
+                                <div class="node-title">Client App</div>
+                            </div>
+                            <div class="node-card" id="node-fastapi">
+                                <div class="node-icon">⚡</div>
+                                <div class="node-title">FastAPI Web</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="server-boundary decoupled">
+                        <div class="server-label">Managed Host / Redis</div>
+                        <div style="margin-top: 2rem;">
+                            <div class="node-card" id="node-redis">
+                                <div class="node-icon">📦</div>
+                                <div class="node-title">Redis Queue</div>
+                                <div class="node-sub">Shared Broker</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="server-boundary decoupled">
+                        <div class="server-label">EC2 Node 2 (Worker Tier)</div>
+                        <div style="margin-top: 2rem;">
+                            <div class="node-card" id="node-worker">
+                                <div class="node-icon">🛠️</div>
+                                <div class="node-title">Celery Worker</div>
+                                <div class="node-sub">Dedicated Compute</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    function switchMode(mode) {
+        if (isSimulating) return;
+        currentMode = mode;
+        document.getElementById('btn-colocated').classList.toggle('active', mode === 'colocated');
+        document.getElementById('btn-decoupled').classList.toggle('active', mode === 'decoupled');
+        renderDiagram(mode);
+        document.getElementById('step-log').innerText = `Switched to ${mode === 'colocated' ? 'Single EC2 (Co-located)' : 'Decoupled (Multi-EC2)'} mode. Ready to simulate.`;
+    }
+
+    async function runSimulation() {
+        if (isSimulating) return;
+        isSimulating = true;
+        
+        const btn = document.getElementById('run-sim-btn');
+        const log = document.getElementById('step-log');
+        btn.disabled = true;
+
+        const steps = [
+            { id: 'node-client', text: 'Step 1: Client sends POST request with photo file payload...', delay: 1000 },
+            { id: 'node-fastapi', text: 'Step 2: FastAPI receives request, validates input, & enqueues task via process_photo.delay()', delay: 1200 },
+            { id: 'node-redis', text: 'Step 3: Task payload pushed to Redis broker. FastAPI immediately returns HTTP 202 to Client! (<30ms)', delay: 1400 },
+            { id: 'node-worker', text: 'Step 4: Celery worker pops task from Redis queue & executes pgvector face embedding computation in background.', delay: 1600 }
+        ];
+
+        for (const step of steps) {
+            // Remove previous active classes
+            document.querySelectorAll('.node-card').forEach(n => n.classList.remove('active-step'));
+            
+            const node = document.getElementById(step.id);
+            if (node) node.classList.add('active-step');
+            log.innerText = step.text;
+            
+            await new Promise(r => setTimeout(r, step.delay));
+        }
+
+        document.querySelectorAll('.node-card').forEach(n => n.classList.remove('active-step'));
+        log.innerText = '✅ Task Execution Complete! Background work finished without blocking FastAPI response.';
+        btn.disabled = false;
+        isSimulating = false;
+    }
+
+    // Initial render
+    renderDiagram('colocated');
+</script>
+</body>
+</html>

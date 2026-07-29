@@ -8,8 +8,9 @@ __pycache__/
 .agent/
 graphify-out/
 .gemini/
-appspec.yml
-scripts/install_dependencies.sh
-scripts/start_server.sh
-scripts/stop_server.sh
-deploy.yml
+# appspec.yml
+# scripts/install_dependencies.sh
+# scripts/start_server.sh
+# scripts/stop_server.sh
+# deploy.yml
+.ssh/
