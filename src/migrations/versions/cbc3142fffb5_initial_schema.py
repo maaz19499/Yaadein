@@ -29,20 +29,9 @@ def upgrade() -> None:
     except Exception:
         pass
 
-    # Check if auth.users already exists (e.g. in Supabase managed auth)
-    conn = op.get_bind()
-    inspector = sa.inspect(conn)
-    schemas = inspector.get_schema_names()
-    
-    if "auth" not in schemas:
-        try:
-            op.execute("CREATE SCHEMA IF NOT EXISTS auth")
-        except Exception:
-            pass
-
-    tables_in_auth = inspector.get_table_names(schema="auth") if "auth" in inspector.get_schema_names() else []
-    
-    if "users" not in tables_in_auth:
+    # Try creating auth schema and auth.users table for local dev (Supabase already has these managed)
+    try:
+        op.execute("CREATE SCHEMA IF NOT EXISTS auth")
         op.create_table(
             "users",
             sa.Column("id", sa.Uuid(), nullable=False),
@@ -53,6 +42,10 @@ def upgrade() -> None:
             sa.PrimaryKeyConstraint("id"),
             schema="auth",
         )
+    except Exception:
+        # On Supabase, auth schema & auth.users table are managed internally
+        pass
+
 
     op.create_table(
         "users",
