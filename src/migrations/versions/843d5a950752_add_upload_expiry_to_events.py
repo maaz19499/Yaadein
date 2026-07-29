@@ -20,19 +20,26 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    op.add_column(
-        "events",
-        sa.Column("upload_expires_at", sa.DateTime(timezone=True), nullable=True),
-    )
-    op.add_column(
-        "events",
-        sa.Column(
-            "face_clustered",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.text("false"),
-        ),
-    )
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col["name"] for col in inspector.get_columns("events")]
+
+    if "upload_expires_at" not in columns:
+        op.add_column(
+            "events",
+            sa.Column("upload_expires_at", sa.DateTime(timezone=True), nullable=True),
+        )
+    if "face_clustered" not in columns:
+        op.add_column(
+            "events",
+            sa.Column(
+                "face_clustered",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("false"),
+            ),
+        )
+
 
 
 def downgrade() -> None:
