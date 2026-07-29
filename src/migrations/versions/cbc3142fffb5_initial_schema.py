@@ -23,14 +23,19 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
+    bind = op.get_bind()
+
     # Ensure vector extension is present
     try:
+        trans = bind.begin_nested()
         op.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        trans.commit()
     except Exception:
-        pass
+        trans.rollback()
 
     # Try creating auth schema and auth.users table for local dev (Supabase already has these managed)
     try:
+        trans = bind.begin_nested()
         op.execute("CREATE SCHEMA IF NOT EXISTS auth")
         op.create_table(
             "users",
@@ -42,9 +47,11 @@ def upgrade() -> None:
             sa.PrimaryKeyConstraint("id"),
             schema="auth",
         )
+        trans.commit()
     except Exception:
         # On Supabase, auth schema & auth.users table are managed internally
-        pass
+        trans.rollback()
+
 
 
     op.create_table(
