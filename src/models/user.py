@@ -29,7 +29,7 @@ class User(Base):
     role: Mapped[str | None] = mapped_column(
         String, nullable=True
     )  # CHECK (role IN ('host', 'photographer', 'admin'))
-    auth_provider: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
