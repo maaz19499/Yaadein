@@ -68,7 +68,7 @@ Open your terminal or Git Bash:
 chmod 400 ~/.ssh/yaadein-ec2-key.pem
 
 # Connect via Public IP
-ssh -i ~/.ssh/yaadein-ec2-key.pem ubuntu@<YOUR_EC2_PUBLIC_IP>
+ssh -i ~/.ssh/yaadein-ec2-key.pem ubuntu@13.203.74.97
 ```
 
 ---
@@ -158,6 +158,10 @@ docker compose version
 Deploy the API and Worker using the production compose file:
 
 ```bash
+
+# Rebuild images without cache
+docker compose -f docker-compose.prod.yml build --no-cache
+
 # Build and launch API & Worker containers in background
 docker compose -f docker-compose.prod.yml up -d --build
 

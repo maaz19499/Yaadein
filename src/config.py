@@ -117,6 +117,15 @@ class Settings(BaseSettings):
             )
         return self.EXPLICIT_R2_ENDPOINT_URL or self.LOCAL_R2_ENDPOINT_URL
 
+    @property
+    def effective_supabase_jwks_url(self) -> str | None:
+        if self.SUPABASE_JWKS_URL:
+            return self.SUPABASE_JWKS_URL
+        if self.SUPABASE_URL:
+            return f"{self.SUPABASE_URL.rstrip('/')}/auth/v1/.well-known/jwks.json"
+        return None
+
+
 
 settings = Settings()
 

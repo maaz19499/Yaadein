@@ -153,3 +153,19 @@ def test_auth_user_not_found(client_without_user):
     response = client_without_user.get("/test-user", headers=headers)
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
     assert "User profile not found in public.users" in response.json()["detail"]
+
+
+def test_auth_asymmetric_token_without_jwks_url(client_with_user, monkeypatch):
+    monkeypatch.setattr(settings, "SUPABASE_JWKS_URL", None)
+    monkeypatch.setattr(settings, "SUPABASE_URL", None)
+    # Create header with ES256
+    import base64
+    header = base64.urlsafe_b64encode(b'{"alg":"ES256","typ":"JWT"}').decode().rstrip("=")
+    body = base64.urlsafe_b64encode(b'{"sub":"123"}').decode().rstrip("=")
+    fake_token = f"{header}.{body}.fakesig"
+
+    headers = {"Authorization": f"Bearer {fake_token}"}
+    response = client_with_user.get("/test-user", headers=headers)
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+    assert "SUPABASE_JWKS_URL" in response.json()["detail"]
+

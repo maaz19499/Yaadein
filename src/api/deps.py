@@ -13,24 +13,29 @@ from src.models.guest import Guest
 
 security = HTTPBearer()
 
-# Initialize JWK Client if JWKS URL is provided
-jwks_client = (
-    PyJWKClient(settings.SUPABASE_JWKS_URL)
-    if settings.SUPABASE_JWKS_URL
-    else None
-)
+# Initialize JWK Client helper
+def get_jwks_client() -> PyJWKClient | None:
+    jwks_url = settings.effective_supabase_jwks_url
+    if jwks_url:
+        return PyJWKClient(jwks_url)
+    return None
 
 
 def decode_supabase_token(token: str) -> dict[str, Any]:
     unverified_header = jwt.get_unverified_header(token)
     alg = unverified_header.get("alg", "HS256")
 
-    if alg == "RS256" and jwks_client:
-        signing_key = jwks_client.get_signing_key_from_jwt(token)
+    if alg != "HS256":
+        client = get_jwks_client()
+        if not client:
+            raise jwt.PyJWTError(
+                f"Token algorithm '{alg}' requires SUPABASE_JWKS_URL or SUPABASE_URL to be set in environment."
+            )
+        signing_key = client.get_signing_key_from_jwt(token)
         return jwt.decode(
             token,
             signing_key.key,
-            algorithms=["RS256"],
+            algorithms=[alg],
             options={"verify_aud": False},
         )
     else:
@@ -40,6 +45,8 @@ def decode_supabase_token(token: str) -> dict[str, Any]:
             algorithms=["HS256"],
             options={"verify_aud": False},
         )
+
+
 
 
 class UploadIdentity:
