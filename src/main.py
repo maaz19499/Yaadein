@@ -1,6 +1,5 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware 
-# pyrefly: ignore [missing-import]
+from fastapi.middleware.cors import CORSMiddleware
 from src.api.v1 import (
     events_router,
     auth_router,
@@ -8,6 +7,7 @@ from src.api.v1 import (
     media_router,
     albums_router,
     downloads_router,
+    profile_router,
 )
 
 app = FastAPI(
@@ -16,10 +16,9 @@ app = FastAPI(
     version="0.1.0",
 )
 
-# Add CORS Middleware <-- Add this block
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allows all origins; replace with specific domains for production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,6 +26,7 @@ app.add_middleware(
 
 app.include_router(events_router, prefix="/api/v1/events")
 app.include_router(auth_router, prefix="/api/v1/events")
+app.include_router(profile_router, prefix="/api/v1/auth")
 app.include_router(uploads_router, prefix="/api/v1/uploads")
 app.include_router(media_router, prefix="/api/v1/media")
 app.include_router(albums_router, prefix="/api/v1/events")

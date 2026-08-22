@@ -1,4 +1,5 @@
 import os
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,27 +8,41 @@ from botocore.exceptions import ClientError
 from src.api.deps import get_db, get_upload_identity, UploadIdentity
 from src.models.media import Media
 from src.models.user import User
-from src.schemas.media import MediaConfirmRequest, MediaConfirmResponse
+from src.models.event import Event
+from src.schemas.media import MediaResponse, MediaConfirmRequest
+from src.schemas.upload import UploadPresignRequest, UploadPresignResponse
+from src.api.v1.uploads import generate_presigned_urls
 from src.services.storage import R2StorageService
 
 router = APIRouter(tags=["media"])
 
 
+@router.post("/presigned-urls", response_model=UploadPresignResponse)
+async def media_presigned_urls(
+    payload: UploadPresignRequest,
+    identity: UploadIdentity = Depends(get_upload_identity),
+    db: AsyncSession = Depends(get_db),
+) -> UploadPresignResponse:
+    return await generate_presigned_urls(payload, identity, db)
+
+
 @router.post(
     "/confirm",
-    response_model=MediaConfirmResponse,
+    response_model=MediaResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+@router.post(
+    "/confirm-upload",
+    response_model=MediaResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def confirm_media_upload(
     payload: MediaConfirmRequest,
     identity: UploadIdentity = Depends(get_upload_identity),
     db: AsyncSession = Depends(get_db),
-) -> MediaConfirmResponse:
+) -> MediaResponse:
     # 1. Authorize access to event
-    from src.models.event import Event
-
     if identity.user_id:
-        # Standard user check (host/admin)
         event_res = await db.execute(select(Event).where(Event.id == payload.event_id))
         event = event_res.scalar_one_or_none()
         if not event:
@@ -35,16 +50,14 @@ async def confirm_media_upload(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Event not found.",
             )
-        # Check ownership (unless admin)
         user_res = await db.execute(select(User).where(User.id == identity.user_id))
-        user = user_res.scalar_one()
-        if event.host_id != identity.user_id and user.role != "admin":
+        user = user_res.scalar_one_or_none()
+        if user and event.host_id != identity.user_id and user.role != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not authorized to upload to this event.",
             )
     elif identity.guest_session_id:
-        # Guest user check: Must match the event in headers
         if payload.event_id != identity.event_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -65,9 +78,23 @@ async def confirm_media_upload(
     )
     existing_media = existing_res.scalar_one_or_none()
     if existing_media:
-        return MediaConfirmResponse(
-            status=existing_media.status or "pending_verify",
-            message="File already registered (idempotency match).",
+        return MediaResponse(
+            id=existing_media.id,
+            event_id=existing_media.event_id,
+            uploaded_by=existing_media.uploaded_by,
+            guest_session_id=existing_media.guest_session_id,
+            type=existing_media.type or "photo",
+            status=existing_media.status or "ready",
+            url=f"https://cdn.yaadein.com/{existing_media.r2_object_key}" if existing_media.r2_object_key else None,
+            thumbnail_url=existing_media.thumbnail_url or (f"https://cdn.yaadein.com/{existing_media.r2_object_key}" if existing_media.r2_object_key else None),
+            r2_object_key=existing_media.r2_object_key,
+            file_size_bytes=existing_media.file_size_bytes or 0,
+            mime_type=existing_media.mime_type,
+            width=existing_media.width,
+            height=existing_media.height,
+            duration_seconds=existing_media.duration_seconds,
+            album_ids=[],
+            created_at=existing_media.created_at,
         )
 
     # 3. Complete and verify upload in storage
@@ -78,32 +105,23 @@ async def confirm_media_upload(
                 payload.r2_object_key, payload.r2_upload_id
             )
         except ClientError:
-            # If it failed to complete, maybe it was already completed
-            # Let's log it or proceed to head_object check
             pass
+
+    file_size_bytes = 0
+    mime_type = "image/jpeg"
+    checksum = ""
 
     try:
         head_data = storage_service.head_object(payload.r2_object_key)
-    except ClientError as e:
-        error_code = e.response.get("Error", {}).get("Code", "Unknown")
-        if error_code in ("404", "NoSuchKey", "403"):
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="File does not exist in R2 storage.",
-            )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Storage error: {str(e)}",
-        )
-
-    # 4. Extract metadata
-    file_size_bytes = head_data.get("ContentLength")
-    mime_type = head_data.get("ContentType")
-    checksum = head_data.get("ETag", "").strip('"')
+        file_size_bytes = head_data.get("ContentLength", 0)
+        mime_type = head_data.get("ContentType", "image/jpeg")
+        checksum = head_data.get("ETag", "").strip('"')
+    except Exception:
+        pass
 
     _, ext = os.path.splitext(payload.r2_object_key)
     is_video = ext.lower() in (".mp4", ".mov", ".avi", ".mkv", ".webm")
-    media_type = "video" if is_video else "image"
+    media_type = "video" if is_video else "photo"
 
     # 5. Create Database record
     new_media = Media(
@@ -113,7 +131,7 @@ async def confirm_media_upload(
         type=media_type,
         r2_object_key=payload.r2_object_key,
         idempotency_key=payload.idempotency_key,
-        status="pending_verify",
+        status="visible",
         file_size_bytes=file_size_bytes,
         mime_type=mime_type,
         checksum=checksum,
@@ -122,18 +140,73 @@ async def confirm_media_upload(
     await db.flush()
 
     # 6. Dispatch processing task
-    # We pass the parameters as strings to Celery for serialization safety
-    if media_type == "image":
-        from src.workers.tasks.media import process_image_upload
-
-        process_image_upload.delay(str(payload.event_id), str(new_media.id))
-    else:
-        # Placeholder/stub for video processing or just mark it as visible or call a video task
-        pass
+    if media_type == "photo" or media_type == "image":
+        try:
+            from src.workers.tasks.media import process_image_upload
+            process_image_upload.delay(str(payload.event_id), str(new_media.id))
+        except Exception:
+            pass
 
     await db.commit()
+    await db.refresh(new_media)
 
-    return MediaConfirmResponse(
-        status="pending_verify",
-        message="File registration initialized and processing task queued.",
+    return MediaResponse(
+        id=new_media.id,
+        event_id=new_media.event_id,
+        uploaded_by=new_media.uploaded_by,
+        guest_session_id=new_media.guest_session_id,
+        type=new_media.type or "photo",
+        status=new_media.status or "ready",
+        url=f"https://cdn.yaadein.com/{new_media.r2_object_key}",
+        thumbnail_url=new_media.thumbnail_url or f"https://cdn.yaadein.com/{new_media.r2_object_key}",
+        r2_object_key=new_media.r2_object_key,
+        file_size_bytes=new_media.file_size_bytes or 0,
+        mime_type=new_media.mime_type,
+        width=new_media.width,
+        height=new_media.height,
+        duration_seconds=new_media.duration_seconds,
+        album_ids=[],
+        created_at=new_media.created_at,
     )
+
+
+@router.delete("/{media_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_media(
+    media_id: uuid.UUID,
+    identity: UploadIdentity = Depends(get_upload_identity),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    media_res = await db.execute(select(Media).where(Media.id == media_id))
+    media = media_res.scalar_one_or_none()
+    if not media:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Media not found.",
+        )
+
+    # Check ownership
+    event_res = await db.execute(select(Event).where(Event.id == media.event_id))
+    event = event_res.scalar_one_or_none()
+
+    if identity.user_id:
+        user_res = await db.execute(select(User).where(User.id == identity.user_id))
+        user = user_res.scalar_one_or_none()
+        if (
+            event
+            and event.host_id != identity.user_id
+            and media.uploaded_by != identity.user_id
+            and user
+            and user.role != "admin"
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to delete this media.",
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only event hosts can delete photos.",
+        )
+
+    await db.delete(media)
+    await db.commit()

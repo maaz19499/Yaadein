@@ -4,6 +4,7 @@ from src.api.v1.uploads import router as uploads_router
 from src.api.v1.media import router as media_router
 from src.api.v1.albums import router as albums_router
 from src.api.v1.downloads import router as downloads_router
+from src.api.v1.profile import router as profile_router
 
 __all__ = [
     "events_router",
@@ -12,4 +13,5 @@ __all__ = [
     "media_router",
     "albums_router",
     "downloads_router",
+    "profile_router",
 ]

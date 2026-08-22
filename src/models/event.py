@@ -15,10 +15,21 @@ class Event(Base):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     slug: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    name: Mapped[str | None] = mapped_column(String, nullable=True)
+    type: Mapped[str | None] = mapped_column(String, nullable=True)
+    date: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    city: Mapped[str | None] = mapped_column(String, nullable=True)
+    cover_photo_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    status: Mapped[str | None] = mapped_column(
+        String, default="pending", server_default="pending"
+    )
+    guest_pin: Mapped[str | None] = mapped_column(String(4), nullable=True)
     face_search_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     plan: Mapped[str | None] = mapped_column(
         String, nullable=True
-    )  # CHECK plan IN ('basic', 'premium', 'professional')
+    )  # CHECK plan IN ('starter', 'basic', 'premium', 'elite', 'professional')
     storage_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
