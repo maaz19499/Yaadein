@@ -1,127 +1,222 @@
-# Yaadein API Design Guide
+# Yaadein API Design & Integration Guide
 
-This guide specifies the production-ready REST API endpoints, JSON payloads, headers, query parameters, and auth requirements for the Yaadein backend.
-
----
-
-## Global API Standards
-
-- **Base URL**: `/api/v1`
-- **Content-Type**: `application/json`
-- **Authentication**:
-  - **User Endpoints**: Authenticated via standard `Authorization: Bearer <supabase_jwt>` in request headers. FastAPI verifies the JWT signature and extracts the user's ID (`sub` claim) and links it to our public `users` profile.
-  - **Guest Endpoints**: Unauthenticated, but requires `X-Guest-Session-ID` and `X-Event-ID` headers to prevent cross-event scanning or unauthorized access.
+This guide is the complete REST API contract for the **Yaadein** platform. It specifies all endpoints, HTTP methods, headers, request bodies, query parameters, and response structures for frontend developers integrating with the backend.
 
 ---
 
-## 1. Authentication & Profiles
+## Table of Contents
+1. [Global API Standards & Authentication](#global-api-standards--authentication)
+2. [Authentication & User Profile](#1-authentication--user-profile)
+3. [Event Lifecycle Management](#2-event-lifecycle-management)
+4. [Guest PIN Gate & Registration](#3-guest-pin-gate--registration)
+5. [Media Upload Pipeline (Direct-to-R2)](#4-media-upload-pipeline-direct-to-r2)
+6. [Live Gallery & Infinite Scroll](#5-live-gallery--infinite-scroll)
+7. [AI Face Recognition & Search](#6-ai-face-recognition--search)
+8. [Albums Management](#7-albums-management)
+9. [Downloads & Background Exports](#8-downloads--background-exports)
+10. [Standard Error Responses](#10-standard-error-responses)
 
-### GET `/auth/me`
-Fetches the public profile of the authenticated Host/Photographer.
-- **Authentication**: Required (JWT)
+---
+
+## Global API Standards & Authentication
+
+- **Base URL**: `http://localhost:8000/api/v1` (or your deployed backend host `/api/v1`)
+- **Content-Type**: `application/json` (except multipart file uploads)
+- **JSON Casing**: The backend supports **`camelCase`** (used by the frontend) as well as `snake_case`.
+- **Authentication Mechanisms**:
+  - **Host / User Endpoints**: Provide Supabase JWT Bearer token in the request headers:
+    ```http
+    Authorization: Bearer <supabase_access_token>
+    ```
+  - **Guest Endpoints**: No login required. Pass guest session tracking headers:
+    ```http
+    X-Guest-Session-ID: <UUID>
+    X-Event-ID: <UUID>
+    ```
+
+---
+
+## 1. Authentication & User Profile
+
+### `GET /auth/profile`
+Fetches the profile of the currently authenticated host/user, including total events created.
+
+- **Auth**: Required (`Bearer <JWT>`)
 - **Response `200 OK`**:
 ```json
 {
-  "id": "u1-uuid-1234",
-  "phone": "+919876543210",
-  "name": "Priya Sharma",
-  "role": "host",
-  "created_at": "2026-06-23T12:00:00Z"
+  "id": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+  "email": "host@yaadein.com",
+  "name": "Aarav Sharma",
+  "avatarUrl": "https://cdn.yaadein.com/avatars/user.jpg",
+  "plan": "premium",
+  "eventsCreated": 3
 }
 ```
 
-### PUT `/auth/profile`
-Updates the name and details of the profile.
-- **Authentication**: Required (JWT)
+### `PATCH /auth/profile`
+Updates the name and avatar of the authenticated user.
+
+- **Auth**: Required (`Bearer <JWT>`)
 - **Request Body**:
 ```json
 {
-  "name": "Priya Rahul Sharma"
+  "name": "Aarav S. Sharma",
+  "avatarUrl": "https://cdn.yaadein.com/avatars/new_user.jpg"
 }
 ```
-- **Response `200 OK`**:
-```json
-{
-  "id": "u1-uuid-1234",
-  "phone": "+919876543210",
-  "name": "Priya Rahul Sharma",
-  "role": "host",
-  "created_at": "2026-06-23T12:00:00Z"
-}
-```
+- **Response `200 OK`**: Updated `UserProfile` object.
 
 ---
 
-## 2. Event Management
+## 2. Event Lifecycle Management
 
-### POST `/events`
-Creates a new event.
-- **Authentication**: Required (JWT, Role: Host/Photographer)
+### `POST /events` (Create Event)
+Creates a new event with initial configuration. Sets status to `pending` (for paid plans) or `active` (for starter/free). Automatically generates a clean, URL-safe slug if not supplied.
+
+- **Auth**: Required (`Bearer <JWT>`, Host/Admin)
 - **Request Body**:
 ```json
 {
-  "slug": "priya-rahul-wedding",
-  "is_wedding": true,
-  "face_search_enabled": false
+  "name": "Rohan & Priya Wedding",
+  "type": "wedding",
+  "date": "2026-12-15T18:30:00.000Z",
+  "city": "Udaipur",
+  "coverPhotoUrl": "https://cdn.yaadein.com/covers/wedding.jpg",
+  "plan": "premium",
+  "guestPin": "4821",
+  "enableFaceSearch": true
 }
 ```
 - **Response `201 Created`**:
 ```json
 {
-  "id": "e1-uuid-5678",
-  "host_id": "u1-uuid-1234",
-  "slug": "priya-rahul-wedding",
-  "plan": "basic",
-  "face_search_enabled": false,
-  "is_wedding": true,
-  "storage_expires_at": "2026-07-23T12:00:00Z",
-  "created_at": "2026-06-23T12:05:00Z"
+  "id": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+  "hostId": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+  "slug": "rohan-priya-wedding-4k9z",
+  "name": "Rohan & Priya Wedding",
+  "type": "wedding",
+  "date": "2026-12-15T18:30:00.000Z",
+  "city": "Udaipur",
+  "coverPhotoUrl": "https://cdn.yaadein.com/covers/wedding.jpg",
+  "status": "pending",
+  "plan": "premium",
+  "photoCount": 0,
+  "videoCount": 0,
+  "guestCount": 0,
+  "storageExpiresAt": "2027-03-15T18:30:00.000Z",
+  "uploadExpiresAt": "2026-12-29T18:30:00.000Z",
+  "expiresAt": "2027-03-15T18:30:00.000Z",
+  "faceClustered": false,
+  "faceSearchEnabled": true,
+  "enableFaceSearch": true,
+  "isWedding": true,
+  "shareUrl": "/e/rohan-priya-wedding-4k9z",
+  "guestPin": "4821",
+  "createdAt": "2026-08-22T14:00:00.000Z"
 }
 ```
 
-### GET `/events`
-Lists all events managed by the currently logged-in host.
-- **Authentication**: Required (JWT)
+### `PATCH /events/{event_id}` (Update Event)
+Performs partial updates on an event. Used for activating the event after payment (`status: "active"`), editing event details, updating cover photos, or changing PIN.
+
+- **Auth**: Required (`Bearer <JWT>`, Host/Owner)
+- **Request Body** (all fields optional):
+```json
+{
+  "status": "active",
+  "coverPhotoUrl": "https://cdn.yaadein.com/covers/wedding-hd.jpg",
+  "guestPin": "5920",
+  "enableFaceSearch": true
+}
+```
+- **Response `200 OK`**: Complete updated `EventResponse` object.
+
+### `GET /events` (List User Events)
+Lists all events created by the logged-in host with real-time aggregated photo, video, and guest counts for dashboard cards.
+
+- **Auth**: Required (`Bearer <JWT>`)
 - **Response `200 OK`**:
 ```json
 [
   {
-    "id": "e1-uuid-5678",
-    "slug": "priya-rahul-wedding",
-    "plan": "basic",
-    "created_at": "2026-06-23T12:05:00Z"
+    "id": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+    "slug": "rohan-priya-wedding-4k9z",
+    "name": "Rohan & Priya Wedding",
+    "type": "wedding",
+    "date": "2026-12-15T18:30:00.000Z",
+    "city": "Udaipur",
+    "coverPhotoUrl": "https://cdn.yaadein.com/covers/wedding.jpg",
+    "status": "active",
+    "plan": "premium",
+    "photoCount": 156,
+    "videoCount": 12,
+    "guestCount": 85,
+    "shareUrl": "/e/rohan-priya-wedding-4k9z",
+    "createdAt": "2026-08-22T14:00:00.000Z"
   }
 ]
 ```
 
-### GET `/events/slug/{slug}`
-Public configuration lookup. Called by the frontend when a guest scans a QR code (before the guest registers a session).
-- **Authentication**: None
+### `GET /events/{id_or_slug}` (Get Event Details)
+Flexible lookup accepting either event UUID (`id`) or human-readable `slug`.
+
+- **Auth**: Public (Optional `Bearer <JWT>`)
+- **Response `200 OK`**: Complete `EventResponse` object.
+
+### `GET /events/{event_id}/qr` (Get QR Code & Share Links)
+Generates and returns the QR code asset URL and pre-formatted share links.
+
+- **Auth**: Public / Host
 - **Response `200 OK`**:
 ```json
 {
-  "id": "e1-uuid-5678",
-  "slug": "priya-rahul-wedding",
-  "face_search_enabled": true,
-  "is_wedding": true,
-  "plan": "basic"
+  "qrUrl": "https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=/e/rohan-priya-wedding-4k9z",
+  "shareUrl": "/e/rohan-priya-wedding-4k9z",
+  "whatsappUrl": "https://api.whatsapp.com/send?text=Upload%20your%20photos%20to%20Rohan%20%26%20Priya%20Wedding%20at%20%2Fe%2Frohan-priya-wedding-4k9z"
 }
 ```
 
 ---
 
-## 3. Guest Registration
+## 3. Guest PIN Gate & Registration
 
-### POST `/events/{event_id}/guests`
-Registers a guest session name when scanning the QR code, storing consent and identity data.
-- **Authentication**: None
+### `POST /events/{event_id}/authenticate` (Verify PIN)
+Validates the 4-digit PIN entered by guests on the event gate screen before granting upload access.
+
+- **Auth**: Public
 - **Request Body**:
 ```json
 {
-  "guest_session_id": "gs-7f2a-uuid-9999",
-  "name": "Rahul Mehta",
-  "phone": "+919123456780",
-  "face_search_consent": true
+  "pin": "4821"
+}
+```
+- **Response `200 OK`**:
+```json
+{
+  "success": true,
+  "message": "Authenticated successfully"
+}
+```
+- **Response `200 OK` (Invalid PIN)**:
+```json
+{
+  "success": false,
+  "message": "Invalid PIN. Please try again."
+}
+```
+
+### `POST /events/{event_id}/guests` (Register Session & Consent)
+Registers guest session information and stores DPDP/GDPR face search consent.
+
+- **Auth**: Public
+- **Request Body**:
+```json
+{
+  "guestSessionId": "7f2a8901-4433-2211-9988-aabbccddeeff",
+  "name": "Kavita Rao",
+  "phone": "+919876543210",
+  "faceSearchConsent": true
 }
 ```
 - **Response `200 OK`**:
@@ -129,38 +224,32 @@ Registers a guest session name when scanning the QR code, storing consent and id
 {
   "status": "success",
   "guest": {
-    "guest_session_id": "gs-7f2a-uuid-9999",
-    "name": "Rahul Mehta",
-    "face_search_consent": true
+    "guestSessionId": "7f2a8901-4433-2211-9988-aabbccddeeff",
+    "name": "Kavita Rao",
+    "faceSearchConsent": true
   }
 }
 ```
 
 ---
 
-## 4. Media Uploads
+## 4. Media Upload Pipeline (Direct-to-R2)
 
-### POST `/uploads/presign`
-Generates batched presigned URLs for direct-to-R2 uploads. Rate-limited per device and event.
-- **Authentication**: None (Requires `X-Guest-Session-ID` / `X-Event-ID` if unauthenticated guest, or standard JWT if host)
+Yaadein uses direct-to-cloud (Cloudflare R2 / S3) chunked multipart uploads so client devices upload large media quickly and reliably without loading the API server.
+
+### `POST /media/presigned-urls` (or `/uploads/presign`)
+Requests presigned upload URLs for batch file uploads (chunk size 8MB).
+
+- **Auth**: Bearer Token (Host) OR `X-Guest-Session-ID` + `X-Event-ID` (Guest)
 - **Request Body**:
 ```json
 {
-  "event_id": "e1-uuid-5678",
+  "eventId": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
   "files": [
     {
-      "client_file_id": "temp-file-1",
-      "file_name": "dance_video.mp4",
-      "file_size_bytes": 118293440,
-      "mime_type": "video/mp4",
-      "checksum": "sha256-a1b2c3d4..."
-    },
-    {
-      "client_file_id": "temp-file-2",
-      "file_name": "selfie.jpg",
-      "file_size_bytes": 4213880,
-      "mime_type": "image/jpeg",
-      "checksum": "sha256-e5f6g7h8..."
+      "filename": "wedding_photo.jpg",
+      "mimeType": "image/jpeg",
+      "sizeBytes": 14500000
     }
   ]
 }
@@ -168,156 +257,205 @@ Generates batched presigned URLs for direct-to-R2 uploads. Rate-limited per devi
 - **Response `200 OK`**:
 ```json
 {
-  "files": [
+  "uploads": [
     {
-      "client_file_id": "temp-file-1",
-      "r2_upload_id": "mp-upload-token-abc123", 
-      "r2_object_key": "events/e1/originals/temp-file-1.mp4",
-      "idempotency_key": "idem-key-video",
-      "chunk_size_bytes": 10485760,
-      "chunks": [
-        { "part_number": 1, "url": "https://r2.cloudflare.com/..." },
-        { "part_number": 2, "url": "https://r2.cloudflare.com/..." }
-      ]
-    },
-    {
-      "client_file_id": "temp-file-2",
-      "r2_upload_id": null, 
-      "r2_object_key": "events/e1/originals/temp-file-2.jpg",
-      "idempotency_key": "idem-key-image",
-      "chunks": [
-        { "part_number": 1, "url": "https://r2.cloudflare.com/..." }
-      ]
+      "fileId": "file_a1b2c3d4e5",
+      "uploadId": "r2_mp_upload_token_9988",
+      "partUrls": [
+        "https://r2.cloudflarestorage.com/yaadein/events/...?partNumber=1",
+        "https://r2.cloudflarestorage.com/yaadein/events/...?partNumber=2"
+      ],
+      "confirmUrl": "/api/v1/media/confirm-upload",
+      "chunkSize": 8388608
     }
   ]
 }
 ```
 
-### POST `/media/confirm`
-Triggers immediate background verification (`HEAD` check on R2, database registration, and dispatches the Celery moderation pipeline).
-- **Authentication**: None (Requires validation headers)
+### `POST /media/confirm-upload` (or `/media/confirm`)
+Confirms completed upload, registers database record in `media` table, and triggers background thumbnailing and face indexing.
+
+- **Auth**: Bearer Token OR Guest Headers
 - **Request Body**:
 ```json
 {
-  "event_id": "e1-uuid-5678",
-  "idempotency_key": "idem-key-image",
-  "r2_object_key": "events/e1/originals/temp-file-2.jpg",
-  "r2_upload_id": null
+  "eventId": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+  "idempotencyKey": "9a8b7c6d5e...",
+  "r2ObjectKey": "events/e3b0c442-98fc-11ee-b9d1-0242ac120002/originals/file_a1b2c3d4e5.jpg",
+  "r2UploadId": "r2_mp_upload_token_9988",
+  "faceConsent": true
 }
 ```
 - **Response `202 Accepted`**:
 ```json
 {
-  "status": "pending_verify",
-  "message": "File registration initialized and processing task queued."
+  "id": "med_1122334455-uuid",
+  "eventId": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+  "uploadedBy": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+  "type": "photo",
+  "status": "ready",
+  "url": "https://cdn.yaadein.com/events/e3b0/originals/file_a1b2c3d4e5.jpg",
+  "thumbnailUrl": "https://cdn.yaadein.com/events/e3b0/thumbs/file_a1b2c3d4e5.webp",
+  "fileSizeBytes": 14500000,
+  "mimeType": "image/jpeg",
+  "width": 4032,
+  "height": 3024,
+  "durationSeconds": null,
+  "albumIds": [],
+  "createdAt": "2026-08-22T14:15:00.000Z"
 }
 ```
 
+### `DELETE /media/{media_id}`
+Deletes a specific photo or video from the event.
+
+- **Auth**: Required (Event Host / Admin)
+- **Response `204 No Content`**
+
 ---
 
-## 5. Gallery Feeds
+## 5. Live Gallery & Infinite Scroll
 
-### GET `/events/{event_id}/gallery`
-Fetches a paginated grid of visible gallery items. Hits the Redis-backed gallery cache.
-- **Authentication**: None
+### `GET /events/{id_or_slug}/gallery`
+Fetches a cursor-paginated grid of visible media, associated albums, and total counts. Supports infinite scrolling.
+
+- **Auth**: Public
 - **Query Parameters**:
-  - `limit` (default: 50)
-  - `cursor` (created_at timestamp + ID for pagination offset)
-  - `face_cluster_ids` (comma-separated cluster IDs for filtered viewing)
+  - `limit`: Integer (default: `30`, max `100`)
+  - `cursor`: UUID string of the last item for pagination offset
+  - `albumId`: Optional UUID to filter by album
+  - `search`: Optional string query
 - **Response `200 OK`**:
 ```json
 {
   "media": [
     {
-      "id": "m1-uuid-777",
-      "type": "image",
-      "thumbnail_url": "https://cdn.yaadein.com/thumbnails/m1.webp",
-      "preview_url": "https://cdn.yaadein.com/previews/m1.webp",
+      "id": "med_1122334455",
+      "eventId": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+      "type": "photo",
+      "status": "ready",
+      "url": "https://cdn.yaadein.com/events/e3b0/originals/img1.jpg",
+      "thumbnailUrl": "https://cdn.yaadein.com/events/e3b0/thumbs/img1.webp",
+      "fileSizeBytes": 3400000,
       "width": 1920,
       "height": 1080,
-      "uploaded_by_name": "Rahul Mehta",
-      "created_at": "2026-06-23T12:10:00Z"
+      "albumIds": [],
+      "createdAt": "2026-08-22T14:15:00.000Z"
     }
   ],
-  "next_cursor": "2026-06-23T12:10:00Z_m1-uuid-777"
+  "albums": [
+    {
+      "id": "alb_sangeet_uuid",
+      "eventId": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+      "name": "Sangeet Night",
+      "type": "static",
+      "emoji": "📁",
+      "mediaCount": 42,
+      "createdAt": "2026-08-22T12:00:00.000Z"
+    }
+  ],
+  "totalCount": 156,
+  "nextCursor": "med_1122334455"
 }
 ```
 
 ---
 
-## 6. Albums & Custom Filters
+## 6. AI Face Recognition & Search
 
-### GET `/events/{event_id}/faces`
-Fetches all face clusters identified in this event (only available if `face_search_enabled` is true).
-- **Authentication**: None (Requires guest session headers verifying consent)
+### `POST /events/{id_or_slug}/face-search`
+Uploads a selfie photo to detect face embeddings and search the event gallery using pgvector cosine similarity.
+
+- **Auth**: Public
+- **Request Format**: `multipart/form-data`
+- **Form Fields**:
+  - `image`: Binary file (`image/jpeg` or `image/png`)
 - **Response `200 OK`**:
 ```json
-[
-  {
-    "cluster_id": "cl1-uuid-999",
-    "matched_guest_name": "Rahul Mehta",
-    "cover_thumbnail_url": "https://cdn.yaadein.com/thumbnails/cl1.webp"
-  }
-]
-```
-
-### POST `/events/{event_id}/albums`
-Creates a custom static or dynamic album.
-- **Authentication**: JWT (Host/Photographer)
-- **Request Body (Dynamic Album)**:
-```json
 {
-  "name": "Selfies of Priya",
-  "type": "dynamic",
-  "dynamic_filters": {
-    "face_cluster_ids": ["cl1-uuid-999"]
-  }
-}
-```
-- **Response `201 Created`**:
-```json
-{
-  "id": "album-uuid-3333",
-  "event_id": "e1-uuid-5678",
-  "name": "Selfies of Priya",
-  "type": "dynamic",
-  "dynamic_filters": {
-    "face_cluster_ids": ["cl1-uuid-999"]
-  },
-  "created_at": "2026-06-23T12:20:00Z"
+  "mediaIds": [
+    "med_1122334455",
+    "med_9988776655",
+    "med_4433221100"
+  ]
 }
 ```
 
 ---
 
-## 7. Gated Downloads & Exports
+## 7. Albums Management
 
-### GET `/media/{event_id}/{media_id}/download`
-Verifies user subscription status and creation-order overage limits, then generates a temporary, short-lived presigned R2 original download URL redirect.
-- **Authentication**: None (Requires guest session validation)
-- **Response `307 Temporary Redirect`**:
-  - Redirects to `https://r2.cloudflare.com/private-bucket/events/e1/...` with a 5-minute expiry token.
-- **Response `403 Forbidden`** (if overage cap hit):
+### `GET /events/{event_id}/albums`
+Fetches all albums created for an event.
+
+- **Auth**: Public
+- **Response `200 OK`**: Array of `AlbumResponse` objects.
+
+### `POST /events/{event_id}/albums`
+Creates a static album (with list of media IDs) or a dynamic album (with filter criteria).
+
+- **Auth**: Required (`Bearer <JWT>`, Host)
+- **Request Body (Static Album)**:
 ```json
 {
-  "error": "DOWNLOAD_LOCKED",
-  "message": "Event storage limit exceeded. Ask the host to upgrade their plan to unlock high-resolution downloads."
+  "name": "Haldi Ceremony",
+  "type": "static",
+  "mediaIds": ["med_1122334455", "med_9988776655"]
 }
 ```
+- **Response `201 Created`**: `AlbumResponse` object.
 
-### POST `/events/{event_id}/exports`
-Triggers background ZIP packaging of the event.
-- **Authentication**: Required (JWT, Host/Photographer)
+### `GET /events/{event_id}/albums/{album_id}`
+Returns all media items belonging to a specific album.
+
+- **Auth**: Public
+- **Response `200 OK`**: Array of `MediaResponse` objects.
+
+---
+
+## 8. Downloads & Background Exports
+
+### `GET /media/{event_id}/{media_id}/download`
+Redirects directly to a short-lived presigned CDN download URL for the original high-resolution photo/video.
+
+- **Auth**: Public / Host
+- **Response `307 Temporary Redirect`**: Redirect to R2 download URL.
+
+### `POST /events/{event_id}/exports`
+Triggers background ZIP compilation of all event media.
+
+- **Auth**: Required (`Bearer <JWT>`, Host)
 - **Request Body**:
 ```json
 {
-  "scope": "full_event" // Options: full_event, album
+  "scope": "full_event"
 }
 ```
 - **Response `202 Accepted`**:
 ```json
 {
-  "export_id": "ex-uuid-0000",
+  "exportId": "exp_11223344-uuid",
   "status": "queued"
 }
 ```
+
+---
+
+## 10. Standard Error Responses
+
+All API errors return a standard JSON error structure with corresponding HTTP status codes:
+
+```json
+{
+  "detail": "Descriptive error message explaining the failure"
+}
+```
+
+| HTTP Status | Error Type | Description |
+| :--- | :--- | :--- |
+| `400 Bad Request` | Validation / Slug Conflict | Invalid parameter format or slug collision. |
+| `401 Unauthorized` | Missing / Invalid Token | JWT expired, invalid, or missing Bearer token. |
+| `403 Forbidden` | Permission Denied | Attempting to modify an event owned by another host. |
+| `404 Not Found` | Resource Missing | Event, media, or user profile does not exist. |
+| `422 Unprocessable Entity` | Pydantic Schema Error | Payload body fields missing or invalid data types. |
+| `500 Server Error` | Internal Server Error | Storage or database exception. |
