@@ -1,9 +1,8 @@
 """add_event_fields_and_indexes
 
 Revision ID: e7f1a2b3c4d5
-Revises: 48c64c1f86af
+Revises: a92f81c92d34
 Create Date: 2026-08-22 14:38:00.000000
-
 """
 
 from typing import Sequence, Union
@@ -13,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = "e7f1a2b3c4d5"
-down_revision: Union[str, Sequence[str], None] = "48c64c1f86af"
+down_revision: Union[str, Sequence[str], None] = "a92f81c92d34"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
