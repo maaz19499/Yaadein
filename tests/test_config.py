@@ -22,7 +22,7 @@ def test_config_production_resolution() -> None:
     )
     assert s.is_production is True
     assert s.DATABASE_URL == supabase_url
-    assert s.REDIS_URL == upstash_url
+    assert s.REDIS_URL == f"{upstash_url}?ssl_cert_reqs=CERT_NONE"
     assert s.R2_ENDPOINT_URL == prod_r2
 
 

@@ -85,8 +85,8 @@ class Settings(BaseSettings):
     def DATABASE_URL(self) -> str:
         if self.is_production:
             return (
-                self.SUPABASE_DATABASE_URL
-                or self.EXPLICIT_DATABASE_URL
+                self.EXPLICIT_DATABASE_URL
+                or self.SUPABASE_DATABASE_URL
                 or self.LOCAL_DATABASE_URL
             )
         return self.EXPLICIT_DATABASE_URL or self.LOCAL_DATABASE_URL
@@ -95,8 +95,8 @@ class Settings(BaseSettings):
     def REDIS_URL(self) -> str:
         if self.is_production:
             url = (
-                self.UPSTASH_REDIS_URL
-                or self.EXPLICIT_REDIS_URL
+                self.EXPLICIT_REDIS_URL
+                or self.UPSTASH_REDIS_URL
                 or self.LOCAL_REDIS_URL
             )
         else:

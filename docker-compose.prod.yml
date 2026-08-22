@@ -1,6 +1,17 @@
 version: "3.8"
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: yaadein-redis
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
   api:
     build:
       context: .
@@ -10,6 +21,11 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
   worker:
@@ -19,4 +35,9 @@ services:
     container_name: yaadein-worker
     env_file:
       - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped

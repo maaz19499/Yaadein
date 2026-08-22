@@ -1,12 +1,12 @@
-# AWS EC2 Free Tier Deployment Guide (Supabase + Upstash Stack)
+# AWS EC2 Free Tier Deployment Guide (Supabase + Local Redis Stack)
 
-This document provides a streamlined, zero-cost deployment guide for **Yaadein** on **AWS EC2 Free Tier**, leveraging managed free tiers for Database (**Supabase**) and Cache/Message Broker (**Upstash Redis**).
+This document provides a streamlined, zero-cost deployment guide for **Yaadein** on **AWS EC2 Free Tier**, leveraging managed free tier for Database (**Supabase**), Cloud Storage (**Cloudflare R2**), and a lightweight containerized Redis broker on EC2 (**redis:7-alpine**, ~15MB RAM).
 
 ---
 
 ## 1. Production Architecture Overview
 
-By offloading PostgreSQL and Redis to managed Cloud Free Tiers, your EC2 instance runs **zero database/broker overhead**, preserving 100% of the 1 GB RAM for your FastAPI application and Celery background workers.
+By running a lightweight Redis container on-box and offloading heavy PostgreSQL joins to Supabase with pgvector, your EC2 instance easily runs within the 1 GB RAM limit while avoiding serverless Redis rate/command limits.
 
 ```
                   ┌───────────────────────────────────────────┐
@@ -22,15 +22,20 @@ By offloading PostgreSQL and Redis to managed Cloud Free Tiers, your EC2 instanc
                   │         ┌───────────v───────────┐         │
                   │         │    yaadein-worker     │         │
                   │         └───────────┬───────────┘         │
-                  └─────────────────────┼─────────────────────┘
+                  │                     │                     │
+                  │         ┌───────────v───────────┐         │
+                  │         │ yaadein-redis (local) │         │
+                  │         │ (~15MB RAM, unlimited)│         │
+                  │         └───────────────────────┘         │
+                  └─────────────────────┬─────────────────────┘
                                         │
-             ┌──────────────────────────┼──────────────────────────┐
-             │                          │                          │
-             v                          v                          v
-┌─────────────────────────┐┌─────────────────────────┐┌─────────────────────────┐
-│ Supabase PostgreSQL     ││ Upstash Redis           ││ Cloudflare R2 / S3      │
-│ (with pgvector extension)││ (TLS Message Broker)    ││ (Media Object Storage)  │
-└─────────────────────────┘└─────────────────────────┘└─────────────────────────┘
+             ┌──────────────────────────┴──────────────────────────┐
+             │                                                     │
+             v                                                     v
+┌─────────────────────────┐                           ┌─────────────────────────┐
+│ Supabase PostgreSQL     │                           │ Cloudflare R2 / S3      │
+│ (with pgvector extension)│                          │ (Media Object Storage)  │
+└─────────────────────────┘                           └─────────────────────────┘
 ```
 
 ---
@@ -132,9 +137,6 @@ docker compose version
 
    # Supabase PostgreSQL Connection
    SUPABASE_DATABASE_URL=postgresql://postgres.xxx:your_password@aws-0-us-east-1.pooler.supabase.com:6543/postgres
-
-   # Upstash Redis Connection (rediss:// for TLS)
-   UPSTASH_REDIS_URL=rediss://default:your_upstash_token@your-redis.upstash.io:6379
 
    # Supabase JWT Secret
    SUPABASE_JWT_SECRET=your_supabase_jwt_secret
