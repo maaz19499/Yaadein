@@ -8,7 +8,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.event import Event
 from src.models.media import Media
-from src.workers.tasks.media import _async_process_image_upload
+from src.workers.tasks.media import (
+    _async_process_image_upload,
+    _async_process_video_upload,
+)
 from tests.api.test_events import create_test_user, delete_test_user
 
 
@@ -362,3 +365,109 @@ async def test_process_image_upload_task_duplicate(db_session: AsyncSession) -> 
         except Exception:
             pass
         await delete_test_user(db_session, host_id)
+
+
+@pytest.mark.asyncio
+async def test_process_video_upload_task_success(db_session: AsyncSession):
+    # 1. Setup host user and event
+    host_id, _ = await create_test_user(db_session, "Host Priya", "host")
+
+    try:
+        slug = f"wedding-{uuid.uuid4().hex[:8]}"
+        event = Event(
+            host_id=host_id,
+            slug=slug,
+            is_wedding=True,
+            face_search_enabled=False,
+            plan="basic",
+        )
+        db_session.add(event)
+        await db_session.commit()
+        await db_session.refresh(event)
+
+        event_id = event.id
+
+        # 2. Setup Media DB record for video in pending_verify status
+        media_id = uuid.uuid4()
+        r2_object_key = f"events/{event_id}/originals/temp-dance.mp4"
+        media = Media(
+            id=media_id,
+            event_id=event_id,
+            uploaded_by=host_id,
+            type="video",
+            r2_object_key=r2_object_key,
+            idempotency_key=f"idem-{media_id.hex}",
+            status="pending_verify",
+            file_size_bytes=15000000,
+            mime_type="video/mp4",
+        )
+        db_session.add(media)
+        await db_session.commit()
+
+        dummy_video_bytes = b"fake-mp4-video-stream-bytes-data"
+
+        # 3. Mock R2 storage calls and run video processing task
+        with patch(
+            "src.services.storage.R2StorageService.get_object_body",
+            return_value=dummy_video_bytes,
+        ) as mock_get:
+            with patch(
+                "src.services.storage.R2StorageService.upload_bytes"
+            ) as mock_upload:
+                with patch(
+                    "src.services.video.extract_video_metadata",
+                    return_value=(45, 1920, 1080),
+                ):
+                    # Execute task synchronously
+                    await _async_process_video_upload(str(event_id), str(media_id))
+
+                    # Verify R2 helper downloads original video
+                    mock_get.assert_called_once_with(r2_object_key)
+
+                    # Verify R2 helper uploads thumbnail and preview WebPs
+                    assert mock_upload.call_count == 2
+
+                    first_call_args = mock_upload.call_args_list[0]
+                    assert (
+                        first_call_args[0][1]
+                        == f"events/{event_id}/thumbnails/{media_id}.webp"
+                    )
+                    assert first_call_args[0][2] == "image/webp"
+
+        # 4. Assert DB row was updated with metadata and status='visible'
+        db_session.expire_all()
+        db_res = await db_session.execute(
+            select(Media).where(Media.event_id == event_id, Media.id == media_id)
+        )
+        updated_media = db_res.scalar_one()
+
+        assert updated_media.status == "visible"
+        assert updated_media.duration_seconds == 45
+        assert updated_media.width == 1920
+        assert updated_media.height == 1080
+        assert updated_media.thumbnail_url is not None
+        assert f"events/{event_id}/thumbnails/{media_id}.webp" in updated_media.thumbnail_url
+
+        # 5. Clean up
+        from sqlalchemy import delete
+
+        await db_session.execute(delete(Media).where(Media.event_id == event_id))
+        await db_session.delete(event)
+        await db_session.commit()
+    finally:
+        try:
+            await db_session.rollback()
+            from sqlalchemy import delete
+
+            await db_session.execute(delete(Media).where(Media.event_id == event_id))
+
+            stmt_evt = select(Event).where(Event.id == event_id)
+            res_evt = await db_session.execute(stmt_evt)
+            e_item = res_evt.scalar_one_or_none()
+            if e_item:
+                await db_session.delete(e_item)
+            await db_session.commit()
+        except Exception:
+            pass
+        await delete_test_user(db_session, host_id)
+

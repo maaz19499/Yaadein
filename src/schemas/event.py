@@ -96,3 +96,23 @@ class EventQRResponse(BaseSchema):
     qr_url: str
     share_url: str
     whatsapp_url: str
+
+
+class MediaCategoryStats(BaseSchema):
+    count: int = 0
+    total_size_bytes: int = 0
+    total_size_formatted: str = "0 B"
+
+
+class EventMediaStatsResponse(BaseSchema):
+    event_id: uuid.UUID
+    photos: MediaCategoryStats
+    videos: MediaCategoryStats
+    total: MediaCategoryStats
+    photo_count: int = 0
+    photo_size_bytes: int = 0
+    video_count: int = 0
+    video_size_bytes: int = 0
+    total_count: int = 0
+    total_size_bytes: int = 0
+

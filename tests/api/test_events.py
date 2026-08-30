@@ -308,3 +308,124 @@ async def test_update_event(client: TestClient, db_session: AsyncSession):
     finally:
         await delete_test_user(db_session, host1_id)
         await delete_test_user(db_session, host2_id)
+
+
+@pytest.mark.asyncio
+async def test_get_event_media_stats_success_and_forbidden(
+    client: TestClient, db_session: AsyncSession
+):
+    # 1. Setup two hosts
+    host1_id, headers1 = await create_test_user(db_session, "Host Ananya", "host")
+    host2_id, headers2 = await create_test_user(db_session, "Host Vikram", "host")
+
+    try:
+        slug = f"wedding-{uuid.uuid4().hex[:8]}"
+        response = client.post(
+            "/api/v1/events",
+            json={"slug": slug, "is_wedding": True},
+            headers=headers1,
+        )
+        assert response.status_code == status.HTTP_201_CREATED
+        event_id = uuid.UUID(response.json()["id"])
+
+        # 2. Add media records: 2 photos + 1 video
+        media_p1 = Media(
+            id=uuid.uuid4(),
+            event_id=event_id,
+            uploaded_by=host1_id,
+            type="photo",
+            r2_object_key=f"events/{event_id}/originals/p1.jpg",
+            idempotency_key=f"idem-{uuid.uuid4().hex}",
+            status="visible",
+            file_size_bytes=5_000_000,
+            mime_type="image/jpeg",
+        )
+        media_p2 = Media(
+            id=uuid.uuid4(),
+            event_id=event_id,
+            uploaded_by=host1_id,
+            type="photo",
+            r2_object_key=f"events/{event_id}/originals/p2.jpg",
+            idempotency_key=f"idem-{uuid.uuid4().hex}",
+            status="visible",
+            file_size_bytes=3_000_000,
+            mime_type="image/jpeg",
+        )
+        media_v1 = Media(
+            id=uuid.uuid4(),
+            event_id=event_id,
+            uploaded_by=host1_id,
+            type="video",
+            r2_object_key=f"events/{event_id}/originals/v1.mp4",
+            idempotency_key=f"idem-{uuid.uuid4().hex}",
+            status="visible",
+            file_size_bytes=20_000_000,
+            mime_type="video/mp4",
+        )
+        # Add one non-visible (pending) media which should not be counted
+        media_pending = Media(
+            id=uuid.uuid4(),
+            event_id=event_id,
+            uploaded_by=host1_id,
+            type="photo",
+            r2_object_key=f"events/{event_id}/originals/pending.jpg",
+            idempotency_key=f"idem-{uuid.uuid4().hex}",
+            status="pending_verify",
+            file_size_bytes=10_000_000,
+            mime_type="image/jpeg",
+        )
+        db_session.add_all([media_p1, media_p2, media_v1, media_pending])
+        await db_session.commit()
+
+        # 3. Request stats by UUID as event host
+        res_uuid = client.get(f"/api/v1/events/{event_id}/stats", headers=headers1)
+        assert res_uuid.status_code == status.HTTP_200_OK
+        data = res_uuid.json()
+
+        assert data["photos"]["count"] == 2
+        assert data["photos"]["totalSizeBytes"] == 8_000_000
+        assert "MB" in data["photos"]["totalSizeFormatted"]
+
+        assert data["videos"]["count"] == 1
+        assert data["videos"]["totalSizeBytes"] == 20_000_000
+        assert "MB" in data["videos"]["totalSizeFormatted"]
+
+        assert data["total"]["count"] == 3
+        assert data["total"]["totalSizeBytes"] == 28_000_000
+        assert "MB" in data["total"]["totalSizeFormatted"]
+
+        # Flat fields assertions
+        assert data["photoCount"] == 2
+        assert data["photoSizeBytes"] == 8_000_000
+        assert data["videoCount"] == 1
+        assert data["videoSizeBytes"] == 20_000_000
+        assert data["totalCount"] == 3
+        assert data["totalSizeBytes"] == 28_000_000
+
+        # 4. Request stats by slug
+        res_slug = client.get(f"/api/v1/events/{slug}/stats", headers=headers1)
+        assert res_slug.status_code == status.HTTP_200_OK
+        assert res_slug.json()["totalCount"] == 3
+
+        # 5. Request by unauthorized host (Host 2) -> 403 Forbidden
+        res_forbidden = client.get(
+            f"/api/v1/events/{event_id}/stats", headers=headers2
+        )
+        assert res_forbidden.status_code == status.HTTP_403_FORBIDDEN
+
+        # 6. Request without auth -> 401 Unauthorized
+        res_unauth = client.get(f"/api/v1/events/{event_id}/stats")
+        assert res_unauth.status_code == status.HTTP_401_UNAUTHORIZED
+
+        # 7. Cleanup
+        from sqlalchemy import delete
+
+        await db_session.execute(delete(Media).where(Media.event_id == event_id))
+        result = await db_session.execute(select(Event).where(Event.id == event_id))
+        event = result.scalar_one()
+        await db_session.delete(event)
+        await db_session.commit()
+    finally:
+        await delete_test_user(db_session, host1_id)
+        await delete_test_user(db_session, host2_id)
+

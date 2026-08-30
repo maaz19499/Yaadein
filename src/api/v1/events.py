@@ -15,12 +15,14 @@ from src.models.user import User
 from src.schemas.album import AlbumResponse
 from src.schemas.event import (
     EventCreate,
+    EventMediaStatsResponse,
     EventPinAuthRequest,
     EventPinAuthResponse,
     EventPublicResponse,
     EventQRResponse,
     EventResponse,
     EventUpdate,
+    MediaCategoryStats,
 )
 from src.schemas.media import FaceSearchResponse, GalleryResponse, MediaResponse
 from src.services.face import FaceEmbeddingService
@@ -255,6 +257,108 @@ async def get_event(
 
     p_count, v_count, g_count = await _get_event_counts(db, event.id)
     return _build_event_response(event, p_count, v_count, g_count)
+
+
+def format_bytes(size_bytes: int) -> str:
+    if size_bytes <= 0:
+        return "0 B"
+    units = ["B", "KB", "MB", "GB", "TB"]
+    unit_index = 0
+    size = float(size_bytes)
+    while size >= 1024.0 and unit_index < len(units) - 1:
+        size /= 1024.0
+        unit_index += 1
+    if unit_index == 0:
+        return f"{int(size)} {units[unit_index]}"
+    return f"{size:.2f} {units[unit_index]}"
+
+
+@router.get("/{id_or_slug}/stats", response_model=EventMediaStatsResponse)
+@router.get("/{id_or_slug}/media-summary", response_model=EventMediaStatsResponse)
+@router.get("/{id_or_slug}/storage-usage", response_model=EventMediaStatsResponse)
+async def get_event_media_stats(
+    id_or_slug: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> EventMediaStatsResponse:
+    event: Event | None = None
+    try:
+        event_uuid = uuid.UUID(id_or_slug)
+        result = await db.execute(select(Event).where(Event.id == event_uuid))
+        event = result.scalar_one_or_none()
+    except ValueError:
+        pass
+
+    if not event:
+        result = await db.execute(select(Event).where(Event.slug == id_or_slug))
+        event = result.scalar_one_or_none()
+
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found.",
+        )
+
+    # Restrict access: only host of the event or admin can view host dashboard stats
+    if event.host_id != current_user.id and current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view storage statistics for this event.",
+        )
+
+    media_res = await db.execute(
+        select(
+            Media.type,
+            func.count(Media.id),
+            func.coalesce(func.sum(Media.file_size_bytes), 0),
+        )
+        .where(Media.event_id == event.id, Media.status == "visible")
+        .group_by(Media.type)
+    )
+    rows = media_res.all()
+
+    photo_count = 0
+    photo_size = 0
+    video_count = 0
+    video_size = 0
+
+    for media_type, count, size_bytes in rows:
+        m_type = (media_type or "").lower()
+        if m_type in ("photo", "image"):
+            photo_count += count
+            photo_size += int(size_bytes or 0)
+        elif m_type == "video":
+            video_count += count
+            video_size += int(size_bytes or 0)
+
+    total_count = photo_count + video_count
+    total_size = photo_size + video_size
+
+    return EventMediaStatsResponse(
+        event_id=event.id,
+        photos=MediaCategoryStats(
+            count=photo_count,
+            total_size_bytes=photo_size,
+            total_size_formatted=format_bytes(photo_size),
+        ),
+        videos=MediaCategoryStats(
+            count=video_count,
+            total_size_bytes=video_size,
+            total_size_formatted=format_bytes(video_size),
+        ),
+        total=MediaCategoryStats(
+            count=total_count,
+            total_size_bytes=total_size,
+            total_size_formatted=format_bytes(total_size),
+        ),
+        photo_count=photo_count,
+        photo_size_bytes=photo_size,
+        video_count=video_count,
+        video_size_bytes=video_size,
+        total_count=total_count,
+        total_size_bytes=total_size,
+    )
+
 
 
 @router.patch("/{id}", response_model=EventResponse)

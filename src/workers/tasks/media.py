@@ -133,6 +133,74 @@ def process_image_upload(event_id: str, media_id: str) -> None:
     asyncio.run(_async_process_image_upload(event_id, media_id))
 
 
+async def _async_process_video_upload(event_id_str: str, media_id_str: str) -> None:
+    event_id = uuid.UUID(event_id_str)
+    media_id = uuid.UUID(media_id_str)
+
+    # 1. Fetch Media record
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(Media).where(Media.event_id == event_id, Media.id == media_id)
+        )
+        media = result.scalar_one_or_none()
+        if not media:
+            raise ValueError(
+                f"Media record not found for event_id={event_id}, id={media_id}"
+            )
+        r2_object_key = media.r2_object_key
+
+    # 2. Download original video from R2
+    storage_service = R2StorageService()
+    video_bytes = storage_service.get_object_body(r2_object_key)
+
+    # 3. Extract metadata and generate poster thumbnails
+    from src.services.video import extract_video_metadata, generate_video_thumbnails
+
+    duration_seconds, width, height = extract_video_metadata(video_bytes)
+    thumbnail_bytes, preview_bytes = generate_video_thumbnails(video_bytes)
+
+    # 4. Upload WebP thumbnail and preview to R2
+    thumbnail_key = f"events/{event_id}/thumbnails/{media_id}.webp"
+    preview_key = f"events/{event_id}/previews/{media_id}.webp"
+
+    storage_service.upload_bytes(thumbnail_bytes, thumbnail_key, "image/webp")
+    storage_service.upload_bytes(preview_bytes, preview_key, "image/webp")
+
+    thumbnail_url = (
+        f"{settings.R2_ENDPOINT_URL}/{settings.R2_BUCKET_NAME}/{thumbnail_key}"
+    )
+
+    # 5. Update Media record in DB
+    async with async_session_maker() as session:
+        update_vals = {
+            "thumbnail_url": thumbnail_url,
+            "status": "visible",
+        }
+        if duration_seconds is not None:
+            update_vals["duration_seconds"] = duration_seconds
+        if width is not None:
+            update_vals["width"] = width
+        if height is not None:
+            update_vals["height"] = height
+
+        await session.execute(
+            update(Media)
+            .where(Media.event_id == event_id, Media.id == media_id)
+            .values(**update_vals)
+        )
+        await session.commit()
+
+
+@celery_app.task(name="src.workers.tasks.media.process_video_upload")
+def process_video_upload(event_id: str, media_id: str) -> None:
+    """
+    Celery task that extracts video metadata, creates WebP thumbnail frames,
+    uploads them to R2, and marks the video as visible in the database.
+    """
+    asyncio.run(_async_process_video_upload(event_id, media_id))
+
+
+
 async def _async_generate_zip_export(
     export_id_str: str, event_id_str: str, scope: str, album_id_str: str | None = None
 ) -> None:

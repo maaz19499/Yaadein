@@ -275,3 +275,92 @@ async def test_media_confirm_success_and_idempotency(
         await db_session.commit()
     finally:
         await delete_test_user(db_session, host_id)
+
+
+@pytest.mark.asyncio
+async def test_video_media_confirm_dispatches_video_processing(
+    client: TestClient, db_session: AsyncSession
+):
+    # 1. Setup host user and event
+    host_id, headers = await create_test_user(db_session, "Host Priya", "host")
+
+    try:
+        slug = f"wedding-{uuid.uuid4().hex[:8]}"
+        event_res = client.post(
+            "/api/v1/events",
+            json={"slug": slug, "is_wedding": True},
+            headers=headers,
+        )
+        event_id = uuid.UUID(event_res.json()["id"])
+
+        # 2. Confirm Video File
+        idempotency_key = f"idem-video-{uuid.uuid4().hex}"
+        r2_object_key = f"events/{event_id}/originals/temp-dance.mp4"
+
+        confirm_payload = {
+            "event_id": str(event_id),
+            "idempotency_key": idempotency_key,
+            "r2_object_key": r2_object_key,
+            "r2_upload_id": "multipart-upload-123",
+        }
+
+        mock_head = {
+            "ContentLength": 18000000,
+            "ContentType": "video/mp4",
+            "ETag": '"etag-video-value"',
+        }
+
+        with patch("src.services.storage.boto3.client") as mock_boto3:
+            mock_s3 = MagicMock()
+            mock_boto3.return_value = mock_s3
+            mock_s3.complete_multipart_upload.return_value = {}
+            mock_s3.head_object.return_value = mock_head
+
+            with patch(
+                "src.workers.tasks.media.process_video_upload.delay"
+            ) as mock_video_celery:
+                response = client.post(
+                    "/api/v1/media/confirm",
+                    json=confirm_payload,
+                    headers=headers,
+                )
+                assert response.status_code == status.HTTP_202_ACCEPTED
+                data = response.json()
+                assert data["type"] == "video"
+
+                # Assert database entry was created with type='video'
+                db_res = await db_session.execute(
+                    select(Media).where(
+                        Media.event_id == event_id,
+                        Media.idempotency_key == idempotency_key,
+                    )
+                )
+                db_media = db_res.scalar_one_or_none()
+                assert db_media is not None
+                assert db_media.type == "video"
+                assert db_media.file_size_bytes == 18000000
+                assert db_media.mime_type == "video/mp4"
+
+                # Assert video celery task dispatched
+                mock_video_celery.assert_called_once_with(
+                    str(event_id), str(db_media.id)
+                )
+
+        # 3. Clean up
+        db_res = await db_session.execute(
+            select(Media).where(
+                Media.event_id == event_id, Media.idempotency_key == idempotency_key
+            )
+        )
+        db_media = db_res.scalar_one()
+        await db_session.delete(db_media)
+
+        event_result = await db_session.execute(
+            select(Event).where(Event.id == event_id)
+        )
+        db_event = event_result.scalar_one()
+        await db_session.delete(db_event)
+        await db_session.commit()
+    finally:
+        await delete_test_user(db_session, host_id)
+

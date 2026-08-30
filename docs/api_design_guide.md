@@ -164,6 +164,38 @@ Flexible lookup accepting either event UUID (`id`) or human-readable `slug`.
 - **Auth**: Public (Optional `Bearer <JWT>`)
 - **Response `200 OK`**: Complete `EventResponse` object.
 
+### `GET /events/{id_or_slug}/stats` (Get Event Media Storage & Count Breakdown)
+Returns real-time aggregated counts, storage sizes in bytes, and human-readable formatted sizes for photos/images and videos.
+
+- **Auth**: Bearer Token (Host or Admin only)
+- **Response `200 OK`**:
+```json
+{
+  "eventId": "e3b0c442-98fc-11ee-b9d1-0242ac120002",
+  "photos": {
+    "count": 156,
+    "totalSizeBytes": 452891230,
+    "totalSizeFormatted": "431.91 MB"
+  },
+  "videos": {
+    "count": 12,
+    "totalSizeBytes": 1245901230,
+    "totalSizeFormatted": "1.16 GB"
+  },
+  "total": {
+    "count": 168,
+    "totalSizeBytes": 1698792460,
+    "totalSizeFormatted": "1.58 GB"
+  },
+  "photoCount": 156,
+  "photoSizeBytes": 452891230,
+  "videoCount": 12,
+  "videoSizeBytes": 1245901230,
+  "totalCount": 168,
+  "totalSizeBytes": 1698792460
+}
+```
+
 ### `GET /events/{event_id}/qr` (Get QR Code & Share Links)
 Generates and returns the QR code asset URL and pre-formatted share links.
 

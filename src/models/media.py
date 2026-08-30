@@ -44,7 +44,7 @@ class Media(Base):
     guest_session_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
     type: Mapped[str | None] = mapped_column(
         String, nullable=True
-    )  # CHECK (type IN ('image', 'video'))
+    )  # CHECK (type IN ('photo', 'image', 'video'))
     r2_object_key: Mapped[str] = mapped_column(String, nullable=False)
     idempotency_key: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str | None] = mapped_column(

@@ -140,9 +140,17 @@ async def confirm_media_upload(
     await db.flush()
 
     # 6. Dispatch processing task
-    if media_type == "photo" or media_type == "image":
+    if media_type == "video":
+        try:
+            from src.workers.tasks.media import process_video_upload
+
+            process_video_upload.delay(str(payload.event_id), str(new_media.id))
+        except Exception:
+            pass
+    elif media_type in ("photo", "image"):
         try:
             from src.workers.tasks.media import process_image_upload
+
             process_image_upload.delay(str(payload.event_id), str(new_media.id))
         except Exception:
             pass
