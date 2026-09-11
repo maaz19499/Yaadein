@@ -148,10 +148,19 @@ docker compose version
 
    # Cloudflare R2 / S3 Storage
    PROD_R2_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com
-   R2_BUCKET_NAME=yaadein-media
+   R2_BUCKET_NAME=yaadein
    R2_ACCESS_KEY_ID=your_r2_key
    R2_SECRET_ACCESS_KEY=your_r2_secret
    ```
+
+   > [!IMPORTANT]
+   > **Cloudflare R2 CORS Configuration**:
+   > Direct browser uploads to presigned URLs will be blocked by browser CORS unless the bucket has CORS enabled.
+   > You can configure it automatically by running:
+   > ```bash
+   > python3 -m scripts.set_r2_cors
+   > ```
+   > or by navigating to Cloudflare Dashboard -> **R2** -> `<bucket>` -> **Settings** -> **CORS Policy**.
 
 ---
 
