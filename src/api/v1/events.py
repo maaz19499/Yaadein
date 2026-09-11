@@ -11,6 +11,7 @@ from src.models.event import Event
 from src.models.guest import Guest
 from src.models.media import Media
 from src.models.face import FaceEmbedding
+from src.models.payment import Payment
 from src.models.user import User
 from src.schemas.album import AlbumResponse
 from src.schemas.event import (
@@ -167,6 +168,18 @@ async def create_event(
         created_at=now,
     )
     db.add(event)
+    await db.flush()
+
+    # If the event requires payment (status is pending), create a pending payment record
+    if initial_status == "pending":
+        payment = Payment(
+            user_id=current_user.id,
+            event_id=event.id,
+            plan=plan_tier,
+            status="pending",
+        )
+        db.add(payment)
+
     await db.commit()
     await db.refresh(event)
 

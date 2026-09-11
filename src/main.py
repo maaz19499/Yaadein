@@ -8,6 +8,7 @@ from src.api.v1 import (
     albums_router,
     downloads_router,
     profile_router,
+    payments_router,
 )
 
 app = FastAPI(
@@ -31,6 +32,7 @@ app.include_router(uploads_router, prefix="/api/v1/uploads")
 app.include_router(media_router, prefix="/api/v1/media")
 app.include_router(albums_router, prefix="/api/v1/events")
 app.include_router(downloads_router, prefix="/api/v1")
+app.include_router(payments_router, prefix="/api/v1/payments")
 
 
 @app.get("/health")
