@@ -21,7 +21,8 @@ dependencies = [
     "pgvector>=0.2.5",
     "alembic>=1.13.1",
     "pyjwt[crypto]>=2.8.0",
-    "python-multipart>=0.0.9"
+    "python-multipart>=0.0.9",
+    "opencv-python-headless>=4.8.0"
 ]
 
 [dependency-groups]
@@ -54,6 +55,8 @@ module = [
     "pgvector",
     "boto3.*",
     "botocore.*",
+    "cv2.*",
+    "cv2",
 ]
 ignore_missing_imports = true
 

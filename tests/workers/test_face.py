@@ -96,7 +96,7 @@ async def test_generate_face_embeddings_success(db_session: AsyncSession):
         for emb in embeddings:
             assert emb.uploader_consent_id == consent_id
             assert emb.embedding is not None
-            assert len(emb.embedding) == 512
+            assert len(emb.embedding) == 128
 
         # Clean up
         from sqlalchemy import delete
@@ -187,15 +187,15 @@ async def test_face_clustering_job(db_session: AsyncSession):
         # Vector 3 is far away from them (cosine similarity with Vector 1 ~ 0.2, distance ~ 0.8 > 0.4)
         # Therefore, DBSCAN (with eps=0.4) should group Vector 1 & 2 into one cluster, and Vector 3 into a second cluster.
 
-        vec1 = [0.0] * 512
+        vec1 = [0.0] * 128
         vec1[0] = 1.0  # [1, 0, 0, ...]
 
-        vec2 = [0.0] * 512
+        vec2 = [0.0] * 128
         vec2[0] = 0.95
         vec2[1] = (1.0 - 0.95**2) ** 0.5  # Unit length vector close to vec1
 
-        vec3 = [0.0] * 512
-        vec3[511] = 1.0  # [0, 0, ..., 1] (orthogonal to vec1/vec2)
+        vec3 = [0.0] * 128
+        vec3[127] = 1.0  # [0, 0, ..., 1] (orthogonal to vec1/vec2)
 
         emb1 = FaceEmbedding(
             event_id=event_id,
@@ -368,7 +368,7 @@ async def test_face_clustering_periodic_job_filters(db_session: AsyncSession):
         emb_expired = FaceEmbedding(
             event_id=event_expired.id,
             media_id=media_exp.id,
-            embedding=[0.5] * 512,
+            embedding=[0.5] * 128,
             uploader_consent_id=consent_exp.id,
             purge_at=event_expired.created_at,
         )
@@ -377,7 +377,7 @@ async def test_face_clustering_periodic_job_filters(db_session: AsyncSession):
         emb_active = FaceEmbedding(
             event_id=event_active.id,
             media_id=media_act.id,
-            embedding=[0.5] * 512,
+            embedding=[0.5] * 128,
             uploader_consent_id=consent_act.id,
             purge_at=event_active.created_at,
         )

@@ -113,11 +113,11 @@ async def test_full_domain_models_creation(db_session: AsyncSession):
     db_session.add(cluster)
     await db_session.flush()
 
-    # embedding is pgvector 512 float dimensions
+    # embedding is pgvector 128 float dimensions
     embedding = FaceEmbedding(
         event_id=event.id,
         media_id=media_id,
-        embedding=[0.1] * 512,
+        embedding=[0.1] * 128,
         cluster_id=cluster.id,
         uploader_consent_id=consent.id,
         purge_at=datetime.now(timezone.utc),
@@ -149,7 +149,7 @@ async def test_full_domain_models_creation(db_session: AsyncSession):
     )
     embedding_row = emb_res.scalar_one_or_none()
     assert embedding_row is not None
-    assert len(embedding_row.embedding) == 512
+    assert len(embedding_row.embedding) == 128
 
     # Query duplicate perceptual hashes (Hamming distance scan)
     # bit_count(phash # :incoming_phash) <= 10

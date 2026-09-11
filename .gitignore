@@ -14,3 +14,5 @@ graphify-out/
 # scripts/stop_server.sh
 # deploy.yml
 .ssh/
+models/weights/
+*.onnx

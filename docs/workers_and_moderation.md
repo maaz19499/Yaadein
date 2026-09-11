@@ -49,7 +49,7 @@ process_image_upload.delay(str(payload.event_id), str(new_media.id))
 
 ### Execution Steps
 1. Downloads the image WebP/JPG from R2 storage.
-2. Detects and extracts facial bounding boxes and 128-dimensional embedding vectors using the Rekognition face index / embedding service.
+2. Detects facial bounding boxes with YuNet and extracts 128-dimensional unit-norm embedding vectors via SFace (OpenCV Zoo, Apache 2.0).
 3. Inserts the coordinates and embeddings into the `face_embeddings` database table.
 
 ---

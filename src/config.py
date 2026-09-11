@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     AWS_ACCESS_KEY_ID: str | None = None
     AWS_SECRET_ACCESS_KEY: str | None = None
 
+    # OpenCV Zoo YuNet & SFace models
+    YUNET_MODEL_PATH: str = "models/weights/face_detection_yunet_2023mar.onnx"
+    SFACE_MODEL_PATH: str = "models/weights/face_recognition_sface_2021dec.onnx"
+    FACE_SCORE_THRESHOLD: float = 0.8
+
     # Customizable plan limits (max_count and max_size_bytes)
     PLAN_LIMITS: dict[str, dict[str, int | None]] = {
         "basic": {

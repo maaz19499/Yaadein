@@ -142,7 +142,7 @@ async def test_albums_lifecycle(client: TestClient, db_session: AsyncSession):
         emb_obj = FaceEmbedding(
             event_id=event_id,
             media_id=media_id_2,
-            embedding=[0.1] * 512,
+            embedding=[0.1] * 128,
             cluster_id=cluster_id,
             uploader_consent_id=consent_obj.id,
             purge_at=event_res.json()["storage_expires_at"],

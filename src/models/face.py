@@ -58,7 +58,7 @@ class FaceEmbedding(Base):
         ForeignKey("events.id", ondelete="CASCADE"), nullable=False
     )
     media_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(512), nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(128), nullable=True)
     cluster_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("face_clusters.id", ondelete="SET NULL"), nullable=True
     )
