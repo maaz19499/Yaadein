@@ -1,9 +1,12 @@
+import logging
 import math
 from typing import Any, cast
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 from src.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class R2StorageService:
@@ -166,3 +169,43 @@ class R2StorageService:
                 ExpiresIn=expires_in,
             ),
         )
+
+    def delete_object(self, object_key: str) -> None:
+        """
+        Deletes a single object from S3/R2 storage.
+        """
+        if not object_key:
+            return
+        try:
+            self.s3_client.delete_object(
+                Bucket=self.bucket_name,
+                Key=object_key,
+            )
+            logger.info("Deleted object %s from bucket %s", object_key, self.bucket_name)
+        except ClientError as e:
+            logger.warning("Failed to delete object %s from R2: %s", object_key, e)
+
+    def delete_objects(self, object_keys: list[str]) -> None:
+        """
+        Deletes multiple objects from S3/R2 storage in batches.
+        """
+        valid_keys = [k for k in object_keys if k]
+        if not valid_keys:
+            return
+
+        chunk_size = 1000
+        for i in range(0, len(valid_keys), chunk_size):
+            chunk = valid_keys[i : i + chunk_size]
+            try:
+                self.s3_client.delete_objects(
+                    Bucket=self.bucket_name,
+                    Delete={"Objects": [{"Key": k} for k in chunk], "Quiet": True},
+                )
+                logger.info(
+                    "Deleted %d objects from bucket %s (batch %d)",
+                    len(chunk),
+                    self.bucket_name,
+                    i // chunk_size + 1,
+                )
+            except ClientError as e:
+                logger.warning("Failed to batch delete objects from R2: %s", e)

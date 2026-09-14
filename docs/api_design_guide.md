@@ -382,11 +382,29 @@ Confirms completed upload, registers database record in `media` table, and trigg
 }
 ```
 
-### `DELETE /media/{media_id}`
-Deletes a specific photo or video from the event.
+### `DELETE /media/{media_id}` (DPDP Right to Erasure)
+Permanently erases a specific photo or video asset and all associated personal data in compliance with **Section 12 of the Digital Personal Data Protection (DPDP) Act, 2023** (*Right to Correction and Erasure of Personal Data*).
 
-- **Auth**: Required (Event Host / Admin)
-- **Response `204 No Content`**
+- **Auth**: 
+  - **Host / Admin / Registered Uploader**: `Authorization: Bearer <JWT>`
+  - **Guest Uploader**: `X-Guest-Session-ID: <UUID>` and `X-Event-ID: <UUID>`
+- **Authorization Rules**:
+  1. **Event Host**: Allowed to delete any media within their event (Host / Content Moderator).
+  2. **Platform Admin**: Allowed to delete any media platform-wide (Governance / Legal Compliance).
+  3. **Authenticated Registered Uploader**: Allowed to erase their own uploaded media (`media.uploaded_by == identity.user_id`).
+  4. **Guest Uploader**: Allowed to erase their own uploaded media (`media.guest_session_id == identity.guest_session_id` and `media.event_id == identity.event_id`).
+  5. Any other caller is rejected with `403 Forbidden`.
+- **Permanent Purge Actions**:
+  1. **Cloud Storage (R2)**: Batched deletion of original file (`media.r2_object_key`), generated WebP preview (`events/{event_id}/previews/{media_id}.webp`), and WebP thumbnail (`events/{event_id}/thumbnails/{media_id}.webp`).
+  2. **Biometric Face Embeddings**: All 128-d biometric embeddings (`face_embeddings`) linked to this photo are permanently purged.
+  3. **Album Associations**: Links in `album_media` are deleted.
+  4. **Cover References**: If this photo served as `Event.cover_photo_url` or `FaceCluster.cover_thumbnail_url`, references are nulled.
+  5. **Gallery Cache Invalidation**: The pre-built `gallery_cache` payload for the event is invalidated and cleared.
+  6. **Audit Compliance**: A structured `DPDP_ERASURE_COMPLETED` audit log is emitted recording media ID, event ID, requesting actor, and purged storage keys.
+- **Responses**:
+  - `204 No Content`: Successful permanent erasure.
+  - `403 Forbidden`: `{"detail": "Not authorized to delete this media under DPDP erasure policy."}`
+  - `404 Not Found`: `{"detail": "Media not found."}`
 
 ---
 

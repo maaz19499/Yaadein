@@ -1,18 +1,23 @@
+import logging
 import os
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from botocore.exceptions import ClientError
 
 from src.api.deps import get_db, get_upload_identity, UploadIdentity
 from src.models.media import Media
 from src.models.user import User
-from src.models.event import Event
+from src.models.event import Event, GalleryCache
+from src.models.face import FaceEmbedding, FaceCluster
+from src.models.album import AlbumMedia
 from src.schemas.media import MediaResponse, MediaConfirmRequest
 from src.schemas.upload import UploadPresignRequest, UploadPresignResponse
 from src.api.v1.uploads import generate_presigned_urls
 from src.services.storage import R2StorageService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["media"])
 
@@ -184,6 +189,21 @@ async def delete_media(
     identity: UploadIdentity = Depends(get_upload_identity),
     db: AsyncSession = Depends(get_db),
 ) -> None:
+    """
+    DPDP Act 2023 (Section 12 - Right to Erasure) Compliant Media Deletion.
+    Permanently erases:
+      1. R2 object storage files (original, preview WebP, thumbnail WebP).
+      2. Biometric vectors (face_embeddings).
+      3. Album associations (album_media).
+      4. Media row in database.
+      5. Clears cover references (Event, FaceCluster) and invalidates GalleryCache.
+
+    Authorization Matrix:
+      - Event Host (event.host_id == identity.user_id)
+      - Super Admin (user.role == "admin")
+      - Authenticated Uploader (media.uploaded_by == identity.user_id)
+      - Guest Uploader (media.guest_session_id == identity.guest_session_id and media.event_id == identity.event_id)
+    """
     media_res = await db.execute(select(Media).where(Media.id == media_id))
     media = media_res.scalar_one_or_none()
     if not media:
@@ -192,29 +212,86 @@ async def delete_media(
             detail="Media not found.",
         )
 
-    # Check ownership
+    # Fetch event
     event_res = await db.execute(select(Event).where(Event.id == media.event_id))
     event = event_res.scalar_one_or_none()
 
+    # Authorization check under DPDP Right to Erasure policy
+    authorized = False
     if identity.user_id:
         user_res = await db.execute(select(User).where(User.id == identity.user_id))
         user = user_res.scalar_one_or_none()
+        if event and event.host_id == identity.user_id:
+            authorized = True
+        elif media.uploaded_by == identity.user_id:
+            authorized = True
+        elif user and user.role == "admin":
+            authorized = True
+    elif identity.guest_session_id:
         if (
-            event
-            and event.host_id != identity.user_id
-            and media.uploaded_by != identity.user_id
-            and user
-            and user.role != "admin"
+            media.guest_session_id == identity.guest_session_id
+            and media.event_id == identity.event_id
         ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not authorized to delete this media.",
-            )
-    else:
+            authorized = True
+
+    if not authorized:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only event hosts can delete photos.",
+            detail="Not authorized to delete this media under DPDP erasure policy.",
         )
 
+    # 1. Purge R2 Storage Objects (original, preview, thumbnail)
+    storage_service = R2StorageService()
+    r2_keys_to_purge = [
+        media.r2_object_key,
+        f"events/{media.event_id}/previews/{media.id}.webp",
+        f"events/{media.event_id}/thumbnails/{media.id}.webp",
+    ]
+    storage_service.delete_objects([k for k in r2_keys_to_purge if k])
+
+    # 2. Database Purge: Face Embeddings and Album Associations
+    await db.execute(
+        delete(FaceEmbedding).where(
+            FaceEmbedding.event_id == media.event_id,
+            FaceEmbedding.media_id == media.id,
+        )
+    )
+    await db.execute(
+        delete(AlbumMedia).where(
+            AlbumMedia.event_id == media.event_id,
+            AlbumMedia.media_id == media.id,
+        )
+    )
+
+    # 3. Disassociate Cover Photo / Face Cluster References
+    if event and event.cover_photo_url and (str(media.id) in event.cover_photo_url or event.cover_photo_url == media.thumbnail_url):
+        event.cover_photo_url = None
+
+    if media.thumbnail_url:
+        await db.execute(
+            update(FaceCluster)
+            .where(
+                FaceCluster.event_id == media.event_id,
+                FaceCluster.cover_thumbnail_url == media.thumbnail_url,
+            )
+            .values(cover_thumbnail_url=None)
+        )
+
+    # 4. Invalidate Gallery Cache
+    await db.execute(
+        delete(GalleryCache).where(GalleryCache.event_id == media.event_id)
+    )
+
+    # 5. Delete Media record from DB
     await db.delete(media)
     await db.commit()
+
+    # 6. Audit Logging for DPDP Compliance
+    logger.info(
+        "DPDP_ERASURE_COMPLETED: media_id=%s, event_id=%s, actor_user_id=%s, actor_guest_session_id=%s, purged_r2_keys=%s",
+        media.id,
+        media.event_id,
+        identity.user_id,
+        identity.guest_session_id,
+        r2_keys_to_purge,
+    )
